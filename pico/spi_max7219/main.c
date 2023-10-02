@@ -35,6 +35,7 @@ void max7219_init();
 void max7219_transfer(uint8_t *buf, uint8_t size);
 void set_pixel(uint8_t x, uint8_t y);
 void clr_pixel(uint8_t x, uint8_t y);
+void display(uint8_t *disp_buffer);
 void disp_buf_debug(uint8_t *disp_buffer);
 
 // Global variables
@@ -53,33 +54,70 @@ int main() {
     max7219_init();
     sleep_ms(2000);
 
-    set_pixel( 31, 0);
-    set_pixel( 0, 1);
-    disp_buf_debug(display_buffer);
+    set_pixel( 0, 0); set_pixel( 31, 0);
+    set_pixel( 0, 1); set_pixel( 31, 1);
+    set_pixel( 0, 2); set_pixel( 31, 2);
+    set_pixel( 0, 3); set_pixel( 31, 3);
+    set_pixel( 0, 7); set_pixel( 31, 7);
+    //disp_buf_debug(display_buffer);
+    display(display_buffer);
 
     while (true) {
         set_pixel( 7, 0);
         clr_pixel( 8, 0);
-        disp_buf_debug(display_buffer);
+//        disp_buf_debug(display_buffer);
+        display(display_buffer);
         sleep_ms(500);
 
         clr_pixel( 7, 0);
         set_pixel( 8, 0);
-        disp_buf_debug(display_buffer);
+//        disp_buf_debug(display_buffer);
+//        display(display_buffer);
+        display(display_buffer);
         sleep_ms(500);
         
-//        set_pixel( 0, 1);
-//        clr_pixel( 31, 1);
+        set_pixel( 30, 7);
 //        disp_buf_debug(display_buffer);
-//        sleep_ms(500);
+        display(display_buffer);
+        sleep_ms(500);
 
-//        set_pixel( 0, 1);
-//        clr_pixel( 31, 1);
+        clr_pixel( 30, 7);
 //        disp_buf_debug(display_buffer);
-//        sleep_ms(500);
+        display(display_buffer);
+        sleep_ms(500);
     }
 }
 
+/* ****************************************************** */
+uint8_t reverse(uint8_t b) {
+/*
+ * 
+ * notes   : Magic code from stackoverflow to reverse byte
+ ******************************************************** */
+    b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
+    b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
+    b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
+    return b;
+}
+
+/* ****************************************************** */
+void display(uint8_t *disp_buffer)
+/*
+ * 
+ * notes   : Display buffer on actual device
+ ******************************************************** */
+{
+    uint8_t buf[8];
+    for(uint8_t idy = 0; idy < 8; idy++) {
+        buf[0] = buf[2] = buf[4] = buf[6] = idy + 1;
+        buf[1] = reverse(display_buffer[0 + 4*idy]);
+        buf[3] = reverse(display_buffer[1 + 4*idy]);
+        buf[5] = reverse(display_buffer[2 + 4*idy]);
+        buf[7] = reverse(display_buffer[3 + 4*idy]);
+        max7219_transfer(buf, 8);          
+        sleep_ms(10);  
+    }
+}
 
 /* ****************************************************** */
 void disp_buf_debug(uint8_t *disp_buffer)
@@ -88,6 +126,7 @@ void disp_buf_debug(uint8_t *disp_buffer)
  * notes   : Debug display buffer onscreen
  ******************************************************** */
 {
+    display(disp_buffer);
     printf("Display buffer content: \n");
     for(uint8_t idy = 0; idy < 8; idy++) {
         for(uint8_t idx = 0; idx < 4; idx++) {
@@ -118,7 +157,7 @@ void set_pixel(uint8_t x, uint8_t y)
  * notes   : Config the spi0 interface
  ******************************************************** */
 {
-    display_buffer[x/8+y] |= 1<<(x%8);
+    display_buffer[x/8+4*y] |= 1<<(x%8);
 }
 
 /* ****************************************************** */
@@ -172,10 +211,10 @@ void max7219_transfer(uint8_t *buf, uint8_t size)
  ****************************************************** */
 {
     
-    for(uint8_t idx = 0; idx < size; idx++) {
-        printf("0x%.2X ", buf[idx]);
-    }
-    printf("\n");
+//    for(uint8_t idx = 0; idx < size; idx++) {
+//        printf("0x%.2X ", buf[idx]);
+//    }
+//    printf("\n");
 
     spi_cs_select();
     spi_write_blocking(spi_default, buf, size);
