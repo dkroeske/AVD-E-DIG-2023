@@ -31,7 +31,7 @@ int main() {
             sleep = 1000;
             printf("+\n");
         } else {
-            sleep = 100;
+            sleep = 130;
             printf("-\n");
         }       
 
