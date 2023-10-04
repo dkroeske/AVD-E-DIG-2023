@@ -33,10 +33,11 @@ void spi_cs_deselect();
 void max7219_init();
 //void max7219_transfer(uint8_t addr, uint8_t data, uint8_t size);
 void max7219_transfer(uint8_t *buf, uint8_t size);
-void set_pixel(uint8_t x, uint8_t y);
-void clr_pixel(uint8_t x, uint8_t y);
-void display(uint8_t *disp_buffer);
-void disp_buf_debug(uint8_t *disp_buffer);
+void set_pixel(uint8_t *dpb, uint8_t x, uint8_t y);
+void clr_pixel(uint8_t *dpb, uint8_t x, uint8_t y);
+void draw_text(uint8_t *dpb, uint8_t x, uint8_t y, char *str);
+void display(uint8_t *pdb);
+void disp_buf_debug(uint8_t *dpb);
 
 // Global variables
 uint8_t display_buffer[4*8] = {0,};
@@ -54,39 +55,49 @@ int main() {
     max7219_init();
     sleep_ms(2000);
 
-    set_pixel( 0, 0); set_pixel( 31, 0);
-    set_pixel( 0, 1); set_pixel( 31, 1);
-    set_pixel( 0, 2); set_pixel( 31, 2);
-    set_pixel( 0, 3); set_pixel( 31, 3);
-    set_pixel( 0, 7); set_pixel( 31, 7);
+    // Test grenzen van het display, in 
+    // alle hoekjes een pixel aan
+    set_pixel(display_buffer, 0, 0); set_pixel(display_buffer, 31, 0);
+    set_pixel(display_buffer, 0, 1); set_pixel(display_buffer, 31, 1);
+    set_pixel(display_buffer, 0, 7); set_pixel(display_buffer, 31, 7);
+
     //disp_buf_debug(display_buffer);
     display(display_buffer);
 
+    // Funny demo loop, not usefull
+    uint8_t x = 0, y = 0;
     while (true) {
-        set_pixel( 7, 0);
-        clr_pixel( 8, 0);
-//        disp_buf_debug(display_buffer);
+        clr_pixel(display_buffer, x, y);
+        x++;
+        if( x == 32 ) {
+            x = 0; 
+            y++;
+            if( y == 8 ) {
+                y = 0;
+                x = 0;
+            }
+        }
+    
+        set_pixel(display_buffer, x, y);
+        set_pixel(display_buffer, 31-x, 7-y);
         display(display_buffer);
-        sleep_ms(500);
-
-        clr_pixel( 7, 0);
-        set_pixel( 8, 0);
-//        disp_buf_debug(display_buffer);
-//        display(display_buffer);
-        display(display_buffer);
-        sleep_ms(500);
-        
-        set_pixel( 30, 7);
-//        disp_buf_debug(display_buffer);
-        display(display_buffer);
-        sleep_ms(500);
-
-        clr_pixel( 30, 7);
-//        disp_buf_debug(display_buffer);
-        display(display_buffer);
-        sleep_ms(500);
     }
 }
+
+extern uint8_t *funny;
+
+/* ****************************************************** */
+void draw_text(uint8_t *dpb, uint8_t x, uint8_t y, char *str) {
+/*
+ * 
+ * notes   : Magic code from stackoverflow to reverse byte
+ ******************************************************** */
+    
+    for(uint8_t idy = 0; idy < 8; idy++) {
+        memcpy(dpb+4*idy, funny+idy, 1);
+    }
+}
+
 
 /* ****************************************************** */
 uint8_t reverse(uint8_t b) {
@@ -101,7 +112,7 @@ uint8_t reverse(uint8_t b) {
 }
 
 /* ****************************************************** */
-void display(uint8_t *disp_buffer)
+void display(uint8_t *pdb)
 /*
  * 
  * notes   : Display buffer on actual device
@@ -110,27 +121,26 @@ void display(uint8_t *disp_buffer)
     uint8_t buf[8];
     for(uint8_t idy = 0; idy < 8; idy++) {
         buf[0] = buf[2] = buf[4] = buf[6] = idy + 1;
-        buf[1] = reverse(display_buffer[0 + 4*idy]);
-        buf[3] = reverse(display_buffer[1 + 4*idy]);
-        buf[5] = reverse(display_buffer[2 + 4*idy]);
-        buf[7] = reverse(display_buffer[3 + 4*idy]);
+        buf[1] = reverse(pdb[0 + 4*idy]);
+        buf[3] = reverse(pdb[1 + 4*idy]);
+        buf[5] = reverse(pdb[2 + 4*idy]);
+        buf[7] = reverse(pdb[3 + 4*idy]);
         max7219_transfer(buf, 8);          
         sleep_ms(10);  
     }
 }
 
 /* ****************************************************** */
-void disp_buf_debug(uint8_t *disp_buffer)
+void disp_buf_debug(uint8_t *dpb)
 /*
  * 
  * notes   : Debug display buffer onscreen
  ******************************************************** */
 {
-    display(disp_buffer);
     printf("Display buffer content: \n");
     for(uint8_t idy = 0; idy < 8; idy++) {
         for(uint8_t idx = 0; idx < 4; idx++) {
-            uint8_t byte = display_buffer[idx+4*idy];
+            uint8_t byte = dpb[idx+4*idy];
             for(uint8_t idz = 0; idz < 8; idz++) {
                 byte & (1<<idz)? printf("*") : printf(".");
             }
@@ -140,24 +150,24 @@ void disp_buf_debug(uint8_t *disp_buffer)
 }
 
 /* ****************************************************** */
-void clr_pixel(uint8_t x, uint8_t y)
+void clr_pixel(uint8_t *pdb, uint8_t x, uint8_t y)
 /*
- * 
+ * in      : pdb is pointer to display buffer
  * notes   : Config the spi0 interface
  ******************************************************** */
 {
-    display_buffer[x/8+4*y] &= ~(1<<(x%8));
+    pdb[x/8+4*y] &= ~(1<<(x%8));
 }
 
 
 /* ****************************************************** */
-void set_pixel(uint8_t x, uint8_t y)
+void set_pixel(uint8_t *pdb, uint8_t x, uint8_t y)
 /*
  * 
  * notes   : Config the spi0 interface
  ******************************************************** */
 {
-    display_buffer[x/8+4*y] |= 1<<(x%8);
+    pdb[x/8+4*y] |= 1<<(x%8);
 }
 
 /* ****************************************************** */
@@ -170,7 +180,7 @@ void max7219_init(void)
 {
 
     // pico speed
-    spi_init(spi0, 10000);
+    spi_init(spi0, 100000);
     spi_set_format(spi0, 8, SPI_CPOL_1, SPI_CPHA_1, SPI_MSB_FIRST);
     
     // default spi settings
