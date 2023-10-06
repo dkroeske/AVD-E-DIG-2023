@@ -35,7 +35,8 @@ void max7219_init();
 void max7219_transfer(uint8_t *buf, uint8_t size);
 void set_pixel(uint8_t *dpb, uint8_t x, uint8_t y);
 void clr_pixel(uint8_t *dpb, uint8_t x, uint8_t y);
-void draw_text(uint8_t *dpb, uint8_t x, uint8_t y, char *str);
+void draw_text(uint8_t *dpb, uint8_t x, uint8_t y, char *str, bool inverse);
+void clr_screen(uint8_t *dpb, uint8_t x, uint8_t y);
 void display(uint8_t *pdb);
 void disp_buf_debug(uint8_t *dpb);
 
@@ -57,47 +58,80 @@ int main() {
 
     // Test grenzen van het display, in 
     // alle hoekjes een pixel aan
-    set_pixel(display_buffer, 0, 0); set_pixel(display_buffer, 31, 0);
-    set_pixel(display_buffer, 0, 1); set_pixel(display_buffer, 31, 1);
-    set_pixel(display_buffer, 0, 7); set_pixel(display_buffer, 31, 7);
+    set_pixel(display_buffer, 0, 0); 
+    set_pixel(display_buffer, 1, 0); 
+    //set_pixel(display_buffer, 31, 0);
+    //set_pixel(display_buffer, 0, 1); 
+    //set_pixel(display_buffer, 31, 1);
+//    set_pixel(display_buffer, 0, 7); set_pixel(display_buffer, 31, 7);
 
     //disp_buf_debug(display_buffer);
     display(display_buffer);
 
+
     // Funny demo loop, not usefull
-    uint8_t x = 0, y = 0;
+    uint8_t x = 0;
     while (true) {
-        clr_pixel(display_buffer, x, y);
-        x++;
-        if( x == 32 ) {
-            x = 0; 
-            y++;
-            if( y == 8 ) {
-                y = 0;
-                x = 0;
-            }
-        }
-    
-        set_pixel(display_buffer, x, y);
-        set_pixel(display_buffer, 31-x, 7-y);
+//        clr_screen(display_buffer, 0, 0);
+        draw_text(display_buffer, x, 0, "hallo", true);
         display(display_buffer);
+        x++;
+        x%=32;
+        draw_text(display_buffer, x, 0, "hallo", false);
+        sleep_ms(100);
+//        clr_pixel(display_buffer, x, y);
+//        x++;
+//        if( x == 32 ) {
+//            x = 0; 
+//            y++;
+//            if( y == 8 ) {
+//                y = 0;
+//                x = 0;
+//            }
+//        }
+    
+//        set_pixel(display_buffer, x, y);
+//        set_pixel(display_buffer, 31-x, 7-y);
+//        display(display_buffer);
     }
 }
 
-extern uint8_t *funny;
+extern uint8_t funny[][8];
 
 /* ****************************************************** */
-void draw_text(uint8_t *dpb, uint8_t x, uint8_t y, char *str) {
+void draw_text(uint8_t *dpb, uint8_t x, uint8_t y, char *str, bool inverse) {
 /*
  * 
- * notes   : Magic code from stackoverflow to reverse byte
+ * notes   :
  ******************************************************** */
-    
-    for(uint8_t idy = 0; idy < 8; idy++) {
-        memcpy(dpb+4*idy, funny+idy, 1);
+   
+    for(uint8_t idx = 0; idx < 8; idx++) {
+        uint8_t b = funny['A'][idx];
+        for( uint8_t idy = 0; idy < 8; idy++ ) {
+            if(b & (1<<idy) ) {
+                inverse != true? clr_pixel(dpb, idx+x, idy+y): set_pixel(dpb, idx+x, idy+y);
+            } else {
+                inverse != true? set_pixel(dpb, idx+x, idy+y): clr_pixel(dpb, idx+x, idy+y);
+            }
+        }
     }
 }
 
+/* ****************************************************** */
+void clr_screen(uint8_t *dpb, uint8_t x, uint8_t y) {
+/*
+ * 
+ * notes   :
+ ******************************************************** */
+
+    for(uint8_t idy = 0; idy < 8; idy++) {
+        for(uint8_t idx = 0; idx < 32; idx++) {
+            clr_pixel(dpb, idx, idy);
+        }
+    }
+    display(dpb);
+    
+}
 
 /* ****************************************************** */
 uint8_t reverse(uint8_t b) {
@@ -156,7 +190,9 @@ void clr_pixel(uint8_t *pdb, uint8_t x, uint8_t y)
  * notes   : Config the spi0 interface
  ******************************************************** */
 {
-    pdb[x/8+4*y] &= ~(1<<(x%8));
+    if( (x < 32) && (y < 8) ) {
+        pdb[x/8+4*y] &= ~(1<<(x%8));
+    }
 }
 
 
@@ -167,7 +203,9 @@ void set_pixel(uint8_t *pdb, uint8_t x, uint8_t y)
  * notes   : Config the spi0 interface
  ******************************************************** */
 {
-    pdb[x/8+4*y] |= 1<<(x%8);
+    if( (x < 32) && (y < 8) ) {
+        pdb[x/8+4*y] |= 1<<(x%8);
+    }
 }
 
 /* ****************************************************** */
