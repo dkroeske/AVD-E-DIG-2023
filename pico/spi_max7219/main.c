@@ -35,13 +35,17 @@ void max7219_init();
 void max7219_transfer(uint8_t *buf, uint8_t size);
 void set_pixel(uint8_t *dpb, uint8_t x, uint8_t y);
 void clr_pixel(uint8_t *dpb, uint8_t x, uint8_t y);
+void draw_char(uint8_t *dpb, uint8_t x, uint8_t y, char ch, bool inverse);
 void draw_text(uint8_t *dpb, uint8_t x, uint8_t y, char *str, bool inverse);
 void clr_screen(uint8_t *dpb, uint8_t x, uint8_t y);
 void display(uint8_t *pdb);
 void disp_buf_debug(uint8_t *dpb);
 
 // Global variables
-uint8_t display_buffer[4*8] = {0,};
+//
+uint8_t display_buffer[NR_MAX7219_DISPLAYS*8] = {0,};
+// Reference to external font lookup
+extern uint8_t funny[][8];
 
 // Main loop
 int main() {
@@ -54,49 +58,36 @@ int main() {
     printf("...\n");
     
     max7219_init();
-    sleep_ms(2000);
+    sleep_ms(250);
 
     // Test grenzen van het display, in 
     // alle hoekjes een pixel aan
     set_pixel(display_buffer, 0, 0); 
     set_pixel(display_buffer, 1, 0); 
-    //set_pixel(display_buffer, 31, 0);
-    //set_pixel(display_buffer, 0, 1); 
-    //set_pixel(display_buffer, 31, 1);
-//    set_pixel(display_buffer, 0, 7); set_pixel(display_buffer, 31, 7);
 
     //disp_buf_debug(display_buffer);
-    display(display_buffer);
 
 
     // Funny demo loop, not usefull
-    uint8_t x = 0;
+    char *str_a = " uC ";
+    char *str_b = "NICE";
     while (true) {
-//        clr_screen(display_buffer, 0, 0);
-        draw_text(display_buffer, x, 0, "hallo", true);
-        display(display_buffer);
-        x++;
-        x%=32;
-        draw_text(display_buffer, x, 0, "hallo", false);
-        sleep_ms(100);
-//        clr_pixel(display_buffer, x, y);
-//        x++;
-//        if( x == 32 ) {
-//            x = 0; 
-//            y++;
-//            if( y == 8 ) {
-//                y = 0;
-//                x = 0;
-//            }
-//        }
-    
-//        set_pixel(display_buffer, x, y);
-//        set_pixel(display_buffer, 31-x, 7-y);
-//        display(display_buffer);
+	clr_screen(display_buffer, 0, 0);
+	draw_text(display_buffer, 0, 0, str_a, false);
+    	set_pixel(display_buffer, 0, 0); 
+    	display(display_buffer);
+	sleep_ms(500);
+
+	clr_screen(display_buffer, 0, 0);
+	draw_text(display_buffer, 0, 0, str_b, false);
+    	clr_pixel(display_buffer, 0, 0); 
+    	display(display_buffer);
+	sleep_ms(500);
     }
 }
 
 extern uint8_t funny[][8];
+
 
 /* ****************************************************** */
 void draw_text(uint8_t *dpb, uint8_t x, uint8_t y, char *str, bool inverse) {
@@ -104,14 +95,28 @@ void draw_text(uint8_t *dpb, uint8_t x, uint8_t y, char *str, bool inverse) {
  * 
  * notes   :
  ******************************************************** */
+    uint8_t idx = 0;
+    while(*str!=0) {
+	    draw_char(dpb, x+8*idx, y, *str, inverse);
+	    str++;
+	    idx++;
+    }
+}
+
+/* ****************************************************** */
+void draw_char(uint8_t *dpb, uint8_t x, uint8_t y, char ch, bool inverse) {
+/*
+ * 
+ * notes   :
+ ******************************************************** */
    
     for(uint8_t idx = 0; idx < 8; idx++) {
-        uint8_t b = funny['A'][idx];
+        uint8_t b = funny[(uint8_t)ch][idx];
         for( uint8_t idy = 0; idy < 8; idy++ ) {
             if(b & (1<<idy) ) {
-                inverse != true? clr_pixel(dpb, idx+x, idy+y): set_pixel(dpb, idx+x, idy+y);
+                inverse == true? clr_pixel(dpb, idx+x, idy+y): set_pixel(dpb, idx+x, idy+y);
             } else {
-                inverse != true? set_pixel(dpb, idx+x, idy+y): clr_pixel(dpb, idx+x, idy+y);
+                inverse == true? set_pixel(dpb, idx+x, idy+y): clr_pixel(dpb, idx+x, idy+y);
             }
         }
     }
