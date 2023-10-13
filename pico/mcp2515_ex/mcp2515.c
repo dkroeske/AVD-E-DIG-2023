@@ -12,7 +12,7 @@ CS     <-->     SPI0_CSn        (#22)
 SO     <-->     SPIO_RX         (#21)
 SI     <-->     SPIO_TX         (#25)
 SCK    <-->     SPIO_SCK        (#24)
-INT    <-->     GPIO            (#21)         
+INT    <-->     GPIO_21         (#27)         
 
 (c) dkroeske@gmail.com
 
@@ -50,10 +50,10 @@ queue_t tx_message_queue;
 /* ************************************************************** */
 void can_init(uint8_t mode)
 /* 
-short	:         
-inputs	:        
-outputs	: 
-notes	:         
+short   :         
+inputs  :        
+outputs : 
+notes   :         
 Version : DMK, Initial code
 ***************************************************************** */
 {
@@ -83,17 +83,17 @@ Version : DMK, Initial code
 
     // Init mcp2515
     mcp2515_init(mode);
-	
+        
 }
 
 
 /**************************************************************** */
-uint8_t can_read_msg(CAN_DATA_FRAME_STRUCT *frame) 
+uint8_t can_rx_data_frame(CAN_DATA_FRAME_STRUCT *frame) 
 /* 
-short	:         
-inputs	:        
-outputs	: 
-notes	:         
+short   :         
+inputs  :        
+outputs : 
+notes   :         
 Version : DMK, Initial code
 *******************************************************************/
 {
@@ -128,84 +128,12 @@ Version : DMK, Initial code
 }
 
 /**************************************************************** */
-void can_write_msg(CAN_DATA_FRAME_STRUCT frames[], uint8_t size)
-/* 
-short	: write can_messages. Store msg in queue and tx interrupt based
-inputs	:        
-outputs	: 
-notes	:         
-Version : DMK, Initial code
-*******************************************************************/
-{
-    uint8_t buf[14];
-
-    // Preproces frames in can chunks
-    for( uint8_t idx = 0; idx < size; idx++ ) {
-        uint8_t datalen = frames[idx].datalen <= 8 ? frames[idx].datalen : 8;
-
-        // Construct buffer content for extended id
-        buf[0] = (uint8_t) ((frames[idx].id << 3) >> 24) ;    // TXBnSIDH
-        buf[1] = (uint8_t) ((((frames[idx].id << 3) | (frames[idx].id & 0x00030000)) >> 16) | EXIDE); // TXBnSIDL
-        buf[2] = frames[idx].id >> 8;  // TXBnEID8      
-        buf[3] = frames[idx].id;       // TXBnEID0
-        buf[4] = datalen;              // TXBnDLC and RTR bit clear
-    
-        // TBnDm
-        for(uint8_t idy = 0; idy < datalen; idy++) {
-            buf[5+idy] = frames[idx].data[idy];
-        }
-    
-        if( !queue_try_add(&tx_message_queue, buf) ) {
-            printf("Error adding to message queue\n");
-        }
-    }
-  
-    // Trigger TX0 by writing first one
-
-    // Write to CAN controller
-    uint8_t tx_buf_id;
-    uint8_t err;
-    while( queue_try_remove(&tx_message_queue, buf) )
-    {
-        bool done = false;
-        while (done == false) {
-            
-            err = 0;
-
-            // Find free transmitbuffer (out of 3)
-            uint8_t status = mcp2515_read_status();
-            if( !(status & 0x04) ) {
-                tx_buf_id = 0x00;
-            } else if ( !(status & 0x10) ) {
-                tx_buf_id = 0x01;
-            } else if ( !(status & 0x40) ) {
-                tx_buf_id = 0x02;
-            } else {
-                err = 1; // No free transmit slot 
-            }
-            
-            if( 0 == err ) {
-		
-                // 
-                mcp2515_load_tx_buffer(tx_buf_id, buf, 13);
-    
-                // ... and request transmit
-                mcp2515_RTS(tx_buf_id);
-
-                done = true;
-            }
-        }
-    }
-}
-
-
-/**************************************************************** */
 uint8_t can_tx_extended_data_frame(CAN_DATA_FRAME_STRUCT *frame)
 /* 
-short	:         
-inputs	:        
-outputs	: 
-notes	:         
+short   :         
+inputs  :        
+outputs : 
+notes   :         
 Version : DMK, Initial code
 *******************************************************************/
 {
@@ -216,18 +144,16 @@ Version : DMK, Initial code
     if( !(status & 0x04) ) {
         tx_buf_id = 0x00;
     } else if ( !(status & 0x10) ) {
-	    tx_buf_id = 0x01;
+            tx_buf_id = 0x01;
     } else if ( !(status & 0x40) ) {
-    	tx_buf_id = 0x02;
+        tx_buf_id = 0x02;
     } else {
-    	err = 1; // No free transmit slot 
+        err = 1; // Oh no, no free transmit slot. Wegwezen!
     }
 
-    //printf("txbuf: %d\n", tx_buf_id);
-
-    // If free transmitterbuffer	
+    // If a free transmitterbuffer is available
     if( 0 == err ) {
-		
+                
         // Temp transmitbuffer and make sure lenght <= 8
         uint8_t buf[14];
         uint8_t datalen = frame->datalen <= 8 ? frame->datalen : 8;
@@ -249,6 +175,8 @@ Version : DMK, Initial code
     
         // ... and request transmit
         mcp2515_RTS(tx_buf_id);
+    } else {
+        printf("Error finding free transmitbuffer");
     }
 
     return err;
@@ -257,10 +185,10 @@ Version : DMK, Initial code
 /* ************************************************************** */
 void can_set_rx_handler( void (*f)(CAN_DATA_FRAME_STRUCT *) )
 /* 
-short	:         
-inputs	:        
-outputs	: 
-notes	:         
+short   :         
+inputs  :        
+outputs : 
+notes   :         
 Version : DMK, Initial code
 ***************************************************************** */
 {
@@ -272,30 +200,30 @@ Version : DMK, Initial code
 /* ************************************************************** */
 void can_set_tx_handler( void (*f)(CAN_DATA_FRAME_STRUCT *) )
 /* 
-short	:         
-inputs	:        
-outputs	: 
-notes	:         
+short   :         
+inputs  :        
+outputs : 
+notes   :         
 Version : DMK, Initial code
 ***************************************************************** */
 {
     if( f != NULL ) {
-	can_tx_fp = f;
+        can_tx_fp = f;
     }
 }
 
 /* ************************************************************** */
 void can_set_err_handler( void (*f)(CAN_ERR_FRAME_STRUCT *) )
 /* 
-short	:         
-inputs	:        
-outputs	: 
-notes	:         
+short   :         
+inputs  :        
+outputs : 
+notes   :         
 Version : DMK, Initial code
 ***************************************************************** */
 {
     if( f != NULL ) {
-	can_err_fp = f;
+        can_err_fp = f;
     }
 }
 
@@ -303,14 +231,14 @@ Version : DMK, Initial code
 /* ************************************************************** */
 void mcp2515_init(uint8_t mode) 
 /* 
-short	:         
-inputs	:        
-outputs	: 
-notes	:         
+short   :         
+inputs  :        
+outputs : 
+notes   :         
 Version : DMK, Initial code
 ***************************************************************** */
 {
-	
+        
     // Reset CAN controller
     mcp2515_reset();
     sleep_ms(10);
@@ -326,17 +254,17 @@ Version : DMK, Initial code
 
     // Set CNF1 (250kbps)
     mcp2515_write_register(CNF1, 0x00); // 0x00
-	
+        
     // Set CNF2 (
     mcp2515_write_register(CNF2, 0xB1); // 0xB8
-	
+        
     // Set CNF3 (
     mcp2515_write_register(CNF3, 0x85); // 0x05
 
     // Interrupts on rx buffers and errors
     mcp2515_write_register(CANINTE, MERRE | ERRIE | RX1IE | RX0IE); 
 
-    // Set NORMAL mode (REQOP_NORMAL or REQOP_LOOPBACK for development)
+    // Set mode (REQOP_NORMAL or REQOP_LOOPBACK for development)
     mcp2515_write_register(CANCTRL, mode);
 
     // Verify mode
@@ -350,17 +278,17 @@ Version : DMK, Initial code
 /* ************************************************************** */
 void mcp2515_callback(uint gpio, uint32_t events)
 /* 
-short	: Perform callback on CAN RX, TX and Err        
-inputs	:        
-outputs	: 
-notes	: 
+short   : Perform callback on CAN RX, TX and Err        
+inputs  :        
+outputs : 
+notes   : 
 Version : DMK, Initial code
 ***************************************************************** */
 {
 
     uint8_t status = mcp2515_read_register(CANINTF);
     //printf("\tCANINTF: 0x%.2X\n", status);
-		
+                
     uint8_t buf[14];
 
     // Check for RX0 and RX1 interrups
@@ -377,7 +305,7 @@ Version : DMK, Initial code
         }
         
         if( !queue_try_add(&rx_message_queue, buf) ) {
-            printf("Error adding to message queue\n");
+            printf("Error adding to RX msg_queue. Is it full?\n");
         }
     }
 }
@@ -385,20 +313,20 @@ Version : DMK, Initial code
 /* ************************************************************** */
 void mcp2515_reset()
 /* 
-short	:         
-inputs	:        
-outputs	: 
-notes	:         
+short   :         
+inputs  :        
+outputs : 
+notes   :         
 Version : DMK, Initial code
 ***************************************************************** */
 {
-	uint8_t buf[] = { CAN_RESET };
-        
+    uint8_t buf[] = { CAN_RESET };
+    
     uint32_t irq_status = save_and_disable_interrupts();
-	
+        
     spi_cs_select();
-	spi_write_blocking(spi_default, buf, 1);
-	spi_cs_deselect();
+    spi_write_blocking(spi_default, buf, 1);
+    spi_cs_deselect();
         
     restore_interrupts(irq_status);
 }
@@ -407,46 +335,45 @@ Version : DMK, Initial code
 /* ************************************************************** */
 uint8_t mcp2515_read_register(uint8_t addr)
 /* 
-short	:         
-inputs	:        
-outputs	: 
-notes	:         
+short   :         
+inputs  :        
+outputs : 
+notes   :         
 Version : DMK, Initial code
 ***************************************************************** */
 {
-	
-	uint8_t buf[2];
+    uint8_t buf[2];
     buf[0] = CAN_READ;
-	buf[1]= addr;
-	uint8_t data;
+    buf[1]= addr;
+    uint8_t data;
 
     uint32_t irq_status = save_and_disable_interrupts();
-	spi_cs_select();
-	spi_write_blocking(spi_default, buf, 2);
-	spi_read_blocking(spi_default, 0, &data, 1);
-	spi_cs_deselect();
+    spi_cs_select();
+    spi_write_blocking(spi_default, buf, 2);
+    spi_read_blocking(spi_default, 0, &data, 1);
+    spi_cs_deselect();
     restore_interrupts(irq_status);
-	
-	return data;
+        
+    return data;
 }
 
 /* *************************************************************** */
 void mcp2515_read_rx_buffer(uint8_t buffer_id, uint8_t *data, uint8_t len)
 /* 
-short	:         
-inputs	:        
-outputs	: 
-notes	:         
+short   :         
+inputs  :        
+outputs : 
+notes   :         
 Version : DMK, Initial code
 ***************************************************************** */
 {
     uint8_t cmd;
     switch(buffer_id) {
         case 0x00:
-       	    cmd = 0x90;	
+            cmd = 0x90; 
             break;
         case 0x01:
-       	    cmd = 0x94;	
+            cmd = 0x94; 
             break;
     }
     
@@ -461,10 +388,10 @@ Version : DMK, Initial code
 /* ************************************************************** */
 void mcp2515_write_register(uint8_t addr, uint8_t data)
 /* 
-short	:         
-inputs	:        
-outputs	: 
-notes	:         
+short   :         
+inputs  :        
+outputs : 
+notes   :         
 Version : DMK, Initial code
 ***************************************************************** */
 {
@@ -484,10 +411,10 @@ Version : DMK, Initial code
 /* ************************************************************** */
 void mcp2515_load_tx_buffer(uint8_t buffer_id, uint8_t *data, uint8_t len) 
 /* 
-short	:         
-inputs	:        
-outputs	: 
-notes	:         
+short   :         
+inputs  :        
+outputs : 
+notes   :         
 Version : DMK, Initial code
 ***************************************************************** */
 {
@@ -516,10 +443,10 @@ Version : DMK, Initial code
 /* ************************************************************** */
 void mcp2515_RTS(uint8_t tx_buf_id)
 /* 
-short	:         
-inputs	:        
-outputs	: 
-notes	:         
+short   :         
+inputs  :        
+outputs : 
+notes   :         
 Version : DMK, Initial code
 ***************************************************************** */
 {
@@ -528,25 +455,25 @@ Version : DMK, Initial code
     uint8_t data = 0x00;
 
     switch(tx_buf_id) {
-	case 0x00:
+        case 0x00:
         data = CAN_RTS_TXB0;
-	    break;
-	case 0x01:
+            break;
+        case 0x01:
         data = CAN_RTS_TXB1;
-	    break;
-	case 0x02:
-	    data = CAN_RTS_TXB2;
-	    break;
-	default:
-	    err = 1;
-	    printf("\tInvalid tx_buf_id: 0x%.2X\n", tx_buf_id);
+            break;
+        case 0x02:
+            data = CAN_RTS_TXB2;
+            break;
+        default:
+            err = 1;
+            printf("\tInvalid tx_buf_id: 0x%.2X\n", tx_buf_id);
     }
 
     if(!err) {
         uint32_t irq_status = save_and_disable_interrupts();
         spi_cs_select();
-	    spi_write_blocking(spi_default, &data, 1);
-	    spi_cs_deselect();
+        spi_write_blocking(spi_default, &data, 1);
+        spi_cs_deselect();
         restore_interrupts(irq_status);
     }
 }
@@ -555,10 +482,10 @@ Version : DMK, Initial code
 /* ************************************************************** */
 uint8_t mcp2515_read_status(void)
 /* 
-short	:         
-inputs	:        
-outputs	: 
-notes	:         
+short   :         
+inputs  :        
+outputs : 
+notes   :         
 Version : DMK, Initial code
 ***************************************************************** */
 {
@@ -568,7 +495,7 @@ Version : DMK, Initial code
     txbuf[1]= 0x00;
     txbuf[2]= 0x00;
     uint8_t rxbuf[2];
-	
+        
     uint32_t irq_status = save_and_disable_interrupts();
     spi_cs_select();
     spi_write_blocking(spi_default, txbuf, 3);
@@ -583,10 +510,10 @@ Version : DMK, Initial code
 /* ************************************************************** */
 uint8_t mcp2515_rx_status(void)
 /* 
-short	:         
-inputs	:        
-outputs	: 
-notes	:         
+short   :         
+inputs  :        
+outputs : 
+notes   :         
 Version : DMK, Initial code
 ***************************************************************** */
 {
@@ -595,7 +522,7 @@ Version : DMK, Initial code
     txbuf[1]= 0x00;
     txbuf[2]= 0x00;
     uint8_t rxbuf[2];
-	
+        
     uint32_t irq_status = save_and_disable_interrupts();
     spi_cs_select();
     spi_write_blocking(spi_default, txbuf, 3);
@@ -610,10 +537,10 @@ Version : DMK, Initial code
 /* ************************************************************** */
 void mcp2515_bit_modify(uint8_t addr, uint8_t mask, uint8_t data)
 /* 
-short	:         
-inputs	:        
-outputs	: 
-notes	:         
+short   :         
+inputs  :        
+outputs : 
+notes   :         
 Version : DMK, Initial code
 ***************************************************************** */
 {
@@ -633,10 +560,10 @@ Version : DMK, Initial code
 /* ************************************************************** */
 static inline void spi_cs_select() 
 /* 
-short	:         
-inputs	:        
-outputs	: 
-notes	:         
+short   :         
+inputs  :        
+outputs : 
+notes   :         
 Version : DMK, Initial code
 ***************************************************************** */
 {
@@ -648,10 +575,10 @@ Version : DMK, Initial code
 /* ************************************************************** */
 static inline void spi_cs_deselect()
 /* 
-short	:         
-inputs	:        
-outputs	: 
-notes	:         
+short   :         
+inputs  :        
+outputs : 
+notes   :         
 Version : DMK, Initial code
 ***************************************************************** */
 {

@@ -1,20 +1,7 @@
-/*********************************************************************
- *   CAN MCP2510 C definitions file                                  *
- *********************************************************************
- *   Filename:       2515REGS.h                                      *
- *   Date:           06/17/03                                        *
- *   File Version:   1.00 (Beta)                                     *
- *********************************************************************
- *   Functions:                                                      *
- *               Header file                                         *
- *********************************************************************
- *   Revision History:                                               *
- *    06/17/03 Updated from MCP2510.inc which was for the 756 board  *
- *********************************************************************/
-
-
 /*******************************************************************
- *                   Register Definitions                          *
+ * Register definitions                          
+ * (c) Microchip, copy uit een MCP2515 voorbeeld project                      
+ * e.g. https://microchip.com/en-us/development-tool/mcp2515dm-pctl
  *******************************************************************/
 
 /* Configuration Registers */

@@ -25,17 +25,21 @@ void on_can_tx(CAN_DATA_FRAME_STRUCT *frame);
 void on_can_err(CAN_ERR_FRAME_STRUCT *err);
 //
 // CAN frame/err debug printf's
+void debug_config();
 void debug_dataframe(CAN_DATA_FRAME_STRUCT *frame);
 void debug_errframe(CAN_ERR_FRAME_STRUCT *frame); 
 
-// Global variables
-CAN_DATA_FRAME_STRUCT frame;
+// 
+#ifndef PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS
+#define PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS (2000)
+#endif
 
 // Main loop
 int main() {
 
-    //
-    stdio_init_all();
+    // Explicit stdio_usb_init() or first printf are skipped
+    stdio_usb_init();
+    sleep_ms(PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS);
         
     // set mode { bijvoorbeeld: REQOP_LOOPBACK, REQOP_NORMAL }
     can_init(REQOP_LOOPBACK);
@@ -46,34 +50,29 @@ int main() {
     can_set_err_handler(&on_can_err);
 
     //
+    CAN_DATA_FRAME_STRUCT tx_frame, rx_frame;
+    
+    uint8_t x = 0;
+    
     while (true) {
-
-        // 
-        uint8_t data =  mcp2515_read_register(CANSTAT);
-        switch (data >> 5) {
-            case 0x00: 
-                printf("Normal Operating mode\n");
-                break;
-            case 0x01: 
-                printf("Sleep mode\n");
-                break;
-            case 0x02: 
-                printf("Loopback mode\n");
-                break;
-            case 0x03: 
-                printf("Listen-Only mode\n");
-                break;
-            case 0x04: 
-                printf("Configuration mode\n");
-                break;
-            default: 
-                printf("Invalid mode!\n");
-                break;
-        } 
         
+        // Construct CAN data frame ...
+        tx_frame.id = 0x50;
+        tx_frame.datalen = 1;
+        tx_frame.data[0] = (uint8_t) x++;
+
+        // ... and sent it out        
+        if( can_tx_extended_data_frame(&tx_frame) ) {
+            printf("can_tx_extended_data_frame() ERROR!\n");
+        }
+
+        // Any frames to read?
+        if( can_rx_data_frame(&rx_frame) ) {
+            debug_dataframe(&rx_frame); 
+        }
+
         // Do something useless
         sleep_ms(2500);
-        
     }
 }
 
@@ -83,10 +82,10 @@ int main() {
 /* ************************************************************* */
 void on_can_rx(CAN_DATA_FRAME_STRUCT *frame) 
 /* 
-short	:         
-inputs	:        
-outputs	: 
-notes	:         
+short   :         
+inputs  :        
+outputs : 
+notes   :         
 Version : DMK, Initial code
 ***************************************************************** */
 {
@@ -98,10 +97,10 @@ Version : DMK, Initial code
 /* ***************************************************************************************** */
 void on_can_tx(CAN_DATA_FRAME_STRUCT *frame) 
 /* 
-short	:         
-inputs	:        
-outputs	: 
-notes	:         
+short   :         
+inputs  :        
+outputs : 
+notes   :         
 Version : DMK, Initial code
 ***************************************************************** */
 {
@@ -112,10 +111,10 @@ Version : DMK, Initial code
 /* ***************************************************************************************** */
 void on_can_err(CAN_ERR_FRAME_STRUCT *err) 
 /* 
-short	:         
-inputs	:        
-outputs	: 
-notes	:         
+short   :         
+inputs  :        
+outputs : 
+notes   :         
 Version : DMK, Initial code
 ***************************************************************** */
 {
@@ -126,13 +125,46 @@ Version : DMK, Initial code
 
 /* UTIL FUNCTIONS */
 
+/* ************************************************************* */
+void debug_config() 
+/* 
+short   :         
+inputs  :        
+outputs : 
+notes   :         
+Version : DMK, Initial code
+***************************************************************** */
+{
+    // 
+    uint8_t data =  mcp2515_read_register(CANSTAT);
+    switch (data >> 5) {
+        case 0x00: 
+            printf("Normal Operating mode\n");
+            break;
+        case 0x01: 
+            printf("Sleep mode\n");
+            break;
+        case 0x02: 
+            printf("Loopback mode\n");
+            break;
+        case 0x03: 
+            printf("Listen-Only mode\n");
+            break;
+        case 0x04: 
+            printf("Configuration mode\n");
+            break;
+        default: 
+            printf("Invalid mode!\n");
+    }
+}
+
 /* ***************************************************************************************** */
 void debug_dataframe(CAN_DATA_FRAME_STRUCT *frame) 
 /* 
-short	: Print CAN dataframe to terminal
-inputs	:        
-outputs	: 
-notes	:         
+short   : Print CAN dataframe to terminal
+inputs  :        
+outputs : 
+notes   :         
 Version : DMK, Initial code
 ***************************************************************** */
 {
@@ -158,10 +190,10 @@ Version : DMK, Initial code
 /* ***************************************************************************************** */
 void debug_errframe(CAN_ERR_FRAME_STRUCT *frame) 
 /* 
-short	: Print CAN errors to terminal
-inputs	:        
-outputs	: 
-notes	:         
+short   : Print CAN errors to terminal
+inputs  :        
+outputs : 
+notes   :         
 Version : DMK, Initial code
 ***************************************************************** */
 {

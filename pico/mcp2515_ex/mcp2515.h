@@ -21,9 +21,8 @@ typedef struct {
 // Init CAN bus 
 void can_init(uint8_t mode);
 
-//
-uint8_t can_read_msg(CAN_DATA_FRAME_STRUCT *frame);
-void can_write_msg(CAN_DATA_FRAME_STRUCT frames[], uint8_t size);
+// Receive dataframe
+uint8_t can_rx_data_frame(CAN_DATA_FRAME_STRUCT *frame);
 
 // Transmit dataframe
 uint8_t can_tx_extended_data_frame(CAN_DATA_FRAME_STRUCT *frame);
