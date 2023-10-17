@@ -22,7 +22,6 @@ typedef struct {
 void can_init(uint8_t mode);
 
 // Receive dataframe
-uint8_t can_rx_data_frame(CAN_DATA_FRAME_STRUCT *frame);
 
 // Transmit dataframe
 uint8_t can_tx_extended_data_frame(CAN_DATA_FRAME_STRUCT *frame);

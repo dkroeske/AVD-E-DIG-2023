@@ -42,37 +42,35 @@ int main() {
     sleep_ms(PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS);
         
     // set mode { bijvoorbeeld: REQOP_LOOPBACK, REQOP_NORMAL }
+    //can_init(REQOP_NORMAL);
     can_init(REQOP_LOOPBACK);
     
     // Init CAN and set callback handlers
     can_set_rx_handler(&on_can_rx);
-    can_set_tx_handler(&on_can_tx);
-    can_set_err_handler(&on_can_err);
+    can_set_tx_handler(&on_can_tx); // Not working yet, work in progress
+    can_set_err_handler(&on_can_err); // Not working yet, work in progress
 
     //
-    CAN_DATA_FRAME_STRUCT tx_frame, rx_frame;
+    CAN_DATA_FRAME_STRUCT tx_frame;
     
-    uint8_t x = 0;
+    uint16_t x = 0;
     
     while (true) {
         
         // Construct CAN data frame ...
         tx_frame.id = 0x50;
-        tx_frame.datalen = 1;
-        tx_frame.data[0] = (uint8_t) x++;
-
+        tx_frame.datalen = 2;
+        tx_frame.data[0] = (uint8_t) x;
+        tx_frame.data[1] = (uint8_t) (x>>8);
+        x++;
+  
         // ... and sent it out        
         if( can_tx_extended_data_frame(&tx_frame) ) {
             printf("can_tx_extended_data_frame() ERROR!\n");
         }
 
-        // Any frames to read?
-        if( can_rx_data_frame(&rx_frame) ) {
-            debug_dataframe(&rx_frame); 
-        }
-
         // Do something useless
-        sleep_ms(2500);
+        sleep_ms(1500);
     }
 }
 
@@ -89,9 +87,7 @@ notes   :
 Version : DMK, Initial code
 ***************************************************************** */
 {
-    puts(">> on_can_rx()");
     debug_dataframe(frame);
-    puts("<< on_can_rx()");
 }
 
 /* ***************************************************************************************** */
@@ -170,14 +166,17 @@ Version : DMK, Initial code
 {
     char buf[1048] = "";
     char line[80];
-    // sprintf(line, "*********** CAN DATAFRAME *************\n");
-    // strcat(buf, line);
+    sprintf(line, "[DATAFRAME] ");
+    strcat(buf, line);
 
     sprintf(line, "ID: 0x%.8X ", (unsigned int)frame->id);
     strcat(buf, line);
+    
+    sprintf(line, "LEN: %.2d ", (unsigned int)frame->datalen);
+    strcat(buf, line);
 
-    // sprintf(line, "Datalen: %.2d\n", frame->datalen);
-    // strcat(buf,line);
+    sprintf(line, "DATA: ");
+    strcat(buf,line);
     for(uint8_t idx = 0; idx < frame->datalen; idx++) {
         sprintf(line, "0x%.2X ", frame->data[idx]);
         strcat(buf, line);

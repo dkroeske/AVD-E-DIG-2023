@@ -17,6 +17,7 @@ INT    <-->     GPIO_21         (#27)
 (c) dkroeske@gmail.com
 
 v1.0    2023-10-10: Initial code
+v1.1    2023-10-17: Added rx, tx en err callback functions
 
 ***************************************************/
 
@@ -35,17 +36,10 @@ v1.0    2023-10-10: Initial code
 static inline void spi_cs_select();
 static inline void spi_cs_deselect();
 
-// prototyping CAN cmd's
-
 // CAN function pointers
 void (*can_rx_fp)(CAN_DATA_FRAME_STRUCT *) = NULL;
 void (*can_tx_fp)(CAN_DATA_FRAME_STRUCT *) = NULL;
 void (*can_err_fp)(CAN_ERR_FRAME_STRUCT *) = NULL;
-
-// CANbus message Queue
-queue_t rx_message_queue;
-queue_t tx_message_queue;
-
 
 /* ************************************************************** */
 void can_init(uint8_t mode)
@@ -72,65 +66,18 @@ Version : DMK, Initial code
     // Make the CS pin available to picotool
     bi_decl(bi_1pin_with_name(PICO_DEFAULT_SPI_CSN_PIN, "spi CS"));
 
-    // Init rx_message queue - raw CAN message is stored
-    queue_init(&rx_message_queue, 14*sizeof(uint8_t), 100);
-
-    // Init tx_message queue - raw CAN message is stored
-    queue_init(&tx_message_queue, 14*sizeof(uint8_t), 100);
-
     // Setup interrupt handler for mcp2515 interrupts
     gpio_set_irq_enabled_with_callback(21, GPIO_IRQ_EDGE_FALL, true, &mcp2515_callback);
 
     // Init mcp2515
     mcp2515_init(mode);
-        
 }
 
-
-/**************************************************************** */
-uint8_t can_rx_data_frame(CAN_DATA_FRAME_STRUCT *frame) 
-/* 
-short   :         
-inputs  :        
-outputs : 
-notes   :         
-Version : DMK, Initial code
-*******************************************************************/
-{
-    uint8_t buf[14];
-   
-    // Read queue
-    bool done = queue_try_remove(&rx_message_queue, buf);
-    
-    if(done) {
-        // Check if standard or extended id 
-        if( buf[1] & 0x08 ) {
-            // Extended ID
-            uint8_t b3 = (buf[0] >> 3);  
-            uint8_t b2 = (buf[0] << 5) | ((buf[1]&0xE0) >>3) | (buf[1]&0x03);
-            uint8_t b1 = buf[2];
-            uint8_t b0 = buf[3];
-            frame->id = b3 << 24 | b2 << 16 | b1 << 8 | b0;
-        } else {
-            // Standard ID
-            frame->id = (buf[1] << 3) | (buf[1] >> 5);
-        }
-        
-        // Get datalenght (clip to max. 8 bytes) 
-        frame->datalen = (buf[4]&0x0F) <= 8 ? buf[4]&0x0F : 8;
-        
-        // Get actual data
-        for(uint8_t idx = 0; idx < frame->datalen; idx++) {
-           frame->data[idx] = buf[5+idx];
-        }
-    }
-    return done;
-}
 
 /**************************************************************** */
 uint8_t can_tx_extended_data_frame(CAN_DATA_FRAME_STRUCT *frame)
 /* 
-short   :         
+short   : Transmit CAN 2.0 dataframe.        
 inputs  :        
 outputs : 
 notes   :         
@@ -294,6 +241,7 @@ Version : DMK, Initial code
     // Check for RX0 and RX1 interrups
     if( (status & RX0IF) || (status & RX1IF) ) {
 
+        // Read MCP2515
         // Check for RX0IF flag -> RX0 buffer contrains CAN message
         if( status & RX0IF ) {
             mcp2515_read_rx_buffer(0, buf, 14);
@@ -303,9 +251,33 @@ Version : DMK, Initial code
                 mcp2515_read_rx_buffer(1, buf, 14);
             } 
         }
+
+        // Prepare CAN_DATA_FRAME
+        CAN_DATA_FRAME_STRUCT frame;        
         
-        if( !queue_try_add(&rx_message_queue, buf) ) {
-            printf("Error adding to RX msg_queue. Is it full?\n");
+        if( buf[1] & 0x08 ) {
+            // Extended ID
+            uint8_t b3 = (buf[0] >> 3);  
+            uint8_t b2 = (buf[0] << 5) | ((buf[1]&0xE0) >>3) | (buf[1]&0x03);
+            uint8_t b1 = buf[2];
+            uint8_t b0 = buf[3];
+            frame.id = b3 << 24 | b2 << 16 | b1 << 8 | b0;
+        } else {
+            // Standard ID
+            frame.id = (buf[1] << 3) | (buf[1] >> 5);
+        }
+        
+        // Get datalenght (clip to max. 8 bytes) 
+        frame.datalen = (buf[4]&0x0F) <= 8 ? buf[4]&0x0F : 8;
+        
+        // Get actual data
+        for(uint8_t idx = 0; idx < frame.datalen; idx++) {
+           frame.data[idx] = buf[5+idx];
+        }
+        
+        // Inform caller
+        if( can_rx_fp != NULL ) {
+            can_rx_fp(&frame);
         }
     }
 }
