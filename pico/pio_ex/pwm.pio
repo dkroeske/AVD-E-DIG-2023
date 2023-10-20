@@ -1,0 +1,49 @@
+.program pio_pwm
+
+.side_set 1
+
+.define public T_ON     3
+.define public T_OFF    1
+
+.wrap_target
+loop:
+    nop     side 1 [T_ON - 1]   ; output ON and wait 3 cycles
+    nop     side 0 [T_OFF - 1]  ; output OFF and wait 1 cycles
+.wrap
+
+% c-sdk {
+
+#include "hardware/clocks.h"
+
+static inline void pwm_put(PIO pio, uint sm, uint8_t x) {
+    while (pio_sm_is_tx_fifo_full(pio, sm))
+        ;
+    *(volatile uint8_t*)&pio->txf[sm] = x;
+}
+
+static inline void pwm_program_init(PIO pio, uint sm, uint offset, uint pin, float freq) {
+
+    // 1 - Default config object
+    pio_sm_config c = pwm_program_get_default_config(offset);
+    
+    // Set this pin's GPIO function (connect PIO to the pad)
+    pio_gpio_init(pio, pin);
+    
+    // Set the pin direction to output at the PIO
+    pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, true);
+
+    //
+    sm_config_set_sideset_pins(&c, pin);
+    
+    //
+    float clk_div = clock_get_hz(clk_sys)/(freq * (pwm_T_ON + pwm_T_OFF));
+    sm_config_set_clkdiv(&c, clk_div);
+
+    // Load our configuration, and jump to the start of the program
+    pio_sm_init(pio, sm, offset, &c);
+
+    // Set the state machine running
+    pio_sm_set_enabled(pio, sm, true);
+}
+
+%}

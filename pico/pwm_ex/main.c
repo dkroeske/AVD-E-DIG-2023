@@ -9,7 +9,7 @@
 #include "hardware/gpio.h"
 #include "hardware/pwm.h"
 
-#define PWM_OUT 1
+#define PWM_OUT 28 
 #define PWM_FREQ 30000                  // fdc = 30kHz
 
 uint calc_dc(){
