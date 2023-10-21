@@ -28,13 +28,6 @@ void pixel(uint8_t r, uint8_t g, uint8_t b) {
 	put_pixel(urgb_u32(g,r,b));
 }
 
-void pattern_sparkle(uint len, uint t) {
-    if (t % 8)
-        return;
-    for (int i = 0; i < len; ++i)
-        put_pixel(rand() % 16 ? 0 : 0xffffffff);
-}
-
 void ws2812_init() {
     PIO pio = pio0;
     int sm = 0;
