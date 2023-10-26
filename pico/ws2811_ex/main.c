@@ -43,23 +43,47 @@ int main() {
     // Init pixels
     ws2812_init();
 
+    uint8_t index = 0;
+
     while(true){        
-    
-        // Soort van knipper effect voor pixel string
-        for (int idx = 0; idx < NR_PIXELS; idx++) {
+
+        // Clear all pixels in buffer
+        for( uint8_t idx = 0; idx < NR_PIXELS; idx++ ) {
             pixels[idx].r = 0;
             pixels[idx].g = 0;
             pixels[idx].b = 0;
         }
-        uint8_t index = rand() % NR_PIXELS;
-        pixels[index].r = 0x55;
-        pixels[index].g = 0x55;
-        pixels[index].b = 0x55;
+        //
+        pixels[index].r = 0xAA;
+        if(index > 0)
+            pixels[index-1].g = 0x55;
+    
+        if(index < NR_PIXELS-1)
+            pixels[index+1].g = 0x55;
+
+        index++;
+        index %= NR_PIXELS;
+
+        
+        play_pixels(pixels, NR_PIXELS);
+        sleep_ms(200);
+
+    
+        // Soort van knipper effect voor pixel string
+//        for (int idx = 0; idx < NR_PIXELS; idx++) {
+//            pixels[idx].r = 0;
+//            pixels[idx].g = 0;
+//            pixels[idx].b = 0;
+//        }
+//        uint8_t index = rand() % NR_PIXELS;
+//        pixels[index].r = 0x55;
+//        pixels[index].g = 0x55;
+//        pixels[index].b = 0x55;
 
         //
-        play_pixels(pixels, NR_PIXELS);
+//        play_pixels(pixels, NR_PIXELS);
 
-        sleep_ms(200);
+//        sleep_ms(200);
     
         // Rood knipperen
 //        pixel(0x55, 0x00, 0x00);
