@@ -27,10 +27,14 @@ add_compile_options(
 
 add_executable(${PROJECT_NAME}
     main.c
+    ws2812.c
+    artnet.c
 )
 
 #
-#pico_generate_pio_header(${PROJECT_NAME})
+pico_generate_pio_header(${PROJECT_NAME}
+    ${CMAKE_CURRENT_LIST_DIR}/ws2812.pio
+)
 
 #
 pico_add_extra_outputs(${PROJECT_NAME})
