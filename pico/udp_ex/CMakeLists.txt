@@ -13,6 +13,18 @@ project(udp_ex C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
+set(WIFI_SSID "${WIFI_SSID}" CACHE INTERNAL "WiFi SSID")
+set(WIFI_PASSWORD "${WIFI_PASSWORD}" CACHE INTERNAL "WiFi PASSWORD")
+
+if("${WIFI_SSID}" STREQUAL "")
+    message("WiFi SSID niet gedefinieerd!")
+endif()
+
+if("${WIFI_PASSWORD}" STREQUAL "")
+    message("WiFi PASSWORD niet gedefinieerd!")
+endif()
+
+
 # Blijkbaar moet onderstaande boven pico_sdk_init(). Zie ook output cmake
 set(PICO_BOARD pico_w)
 
@@ -50,6 +62,12 @@ target_link_libraries(${PROJECT_NAME}
     pico_util
     pico_cyw43_arch_lwip_threadsafe_background
     hardware_spi
+)
+
+#
+target_compile_definitions(${PROJECT_NAME} PRIVATE
+    WIFI_SSID=\"${WIFI_SSID}\"
+    WIFI_PASSWORD=\"${WIFI_PASSWORD}\"
 )
 
 #

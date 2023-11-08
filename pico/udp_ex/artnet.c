@@ -119,9 +119,9 @@ void artnet_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t
                     }
 
                     // Debug: print universe and sequence nummer
-                    for(uint8_t idx = 0; idx < artdmx_index+1; idx++) {
-                        printf("SubUni %.2d: Sequence: %.2d\n", artdmx[idx].SubUni, artdmx[idx].Sequence);
-                    }
+//                    for(uint8_t idx = 0; idx < artdmx_index+1; idx++) {
+//                        printf("SubUni %.2d: Sequence: %.2d\n", artdmx[idx].SubUni, artdmx[idx].Sequence);
+//                    }
                             
                     artdmx_index = 0;
                     artdmx[artdmx_index] = dmx;
