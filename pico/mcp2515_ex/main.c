@@ -5,6 +5,7 @@ Basic MCP2515 CAN application. Rx and Tx of CAN frames
 (c) dkroeske@gmail.com
 
 v1.0    2023-10-10: Initial code
+v1.1    2023-12-04: Added filtering example
 
 ***************************************************/
 
@@ -56,8 +57,21 @@ int main() {
     uint16_t x = 0;
     
     while (true) {
-        
-        // Construct CAN data frame ...
+ 
+        // Construct 2 CAN data frames, we will filter one out later ...
+        // Frame 1
+        tx_frame.id = 0x101;
+        tx_frame.datalen = 1;
+        tx_frame.data[0] = 0xAA;
+  
+        // ... and sent it out        
+        if( can_tx_extended_data_frame(&tx_frame) ) {
+            printf("can_tx_extended_data_frame() ERROR!\n");
+        }
+        sleep_ms(500);
+       
+        // Construct 2 CAN data frames, we will filter one out later ...
+        // Frame 2
         tx_frame.id = 0x50;
         tx_frame.datalen = 2;
         tx_frame.data[0] = (uint8_t) x;
@@ -68,9 +82,7 @@ int main() {
         if( can_tx_extended_data_frame(&tx_frame) ) {
             printf("can_tx_extended_data_frame() ERROR!\n");
         }
-
-        // Do something useless
-        sleep_ms(1500);
+        sleep_ms(500);
     }
 }
 
@@ -87,7 +99,10 @@ notes   :
 Version : DMK, Initial code
 ***************************************************************** */
 {
-    debug_dataframe(frame);
+//    debug_dataframe(frame);
+    if( frame->id == 0x101 ) {
+        debug_dataframe(frame);    
+    }
 }
 
 /* ***************************************************************************************** */
