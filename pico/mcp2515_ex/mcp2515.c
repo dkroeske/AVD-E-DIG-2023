@@ -197,7 +197,33 @@ Version : DMK, Initial code
     mcp2515_write_register(RXM0EID0, 0x00);
 
     // Clear filter and EXIDE bit
-    mcp2515_write_register(RXF0SIDL, 0x00);
+    //mcp2515_write_register(RXF0SIDL, 0x00);
+
+    // Optional: set filter to rx only ID = 0x101 (p25 datasheet)
+    // Mask   = 0x1FFFFFFF = b0001 1111 1111 1111 1111 1111 1111 1111 (29 bits!)
+    // Filter = 0x00000101 = b0000 0000 0000 0000 0000 0001 0000 0001 (ID = 0x101)
+
+/*  
+    uint32_t mask   = 0x1FFFFFFF;
+    uint32_t filter = 0x00000101; 
+    // Set acceptence mask for RxB0 en RxB1 
+    mcp2515_write_register(RXM0SIDH, (uint8_t)((mask << 3) >> 24));
+    mcp2515_write_register(RXM0SIDL, (uint8_t)((((mask << 3)|(mask & 0x00030000)) >> 16) | EXIDE));
+    mcp2515_write_register(RXM0EID8, (uint8_t)(mask >> 8));
+    mcp2515_write_register(RXM0EID0, (uint8_t)(mask));
+    
+    // Set acceptence mask for RxB0 en RxB1 
+    mcp2515_write_register(RXM1SIDH, (uint8_t)((mask << 3) >> 24));
+    mcp2515_write_register(RXM1SIDL, (uint8_t)((((mask << 3)|(mask & 0x00030000)) >> 16) | EXIDE));
+    mcp2515_write_register(RXM1EID8, (uint8_t)(mask >> 8));
+    mcp2515_write_register(RXM1EID0, (uint8_t)(mask));
+
+    // Set filter for RxB0 on ID = 0x101
+    mcp2515_write_register(RXF0SIDH, (uint8_t)((filter << 3) >> 24));
+    mcp2515_write_register(RXF0SIDL, (uint8_t)((((filter << 3)|(filter & 0x00030000)) >> 16) | EXIDE));
+    mcp2515_write_register(RXF0EID8, (uint8_t)(filter >> 8));
+    mcp2515_write_register(RXF0EID0, (uint8_t)(filter));
+*/
 
     // Set CNF1 (250kbps)
     mcp2515_write_register(CNF1, 0x00); // 0x00

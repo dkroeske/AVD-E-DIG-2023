@@ -99,10 +99,12 @@ notes   :
 Version : DMK, Initial code
 ***************************************************************** */
 {
-//    debug_dataframe(frame);
-    if( frame->id == 0x101 ) {
-        debug_dataframe(frame);    
-    }
+    debug_dataframe(frame);
+    
+// Filter in code OR in MASK en FILTERS in mcp2515
+//    if( frame->id == 0x101 ) {
+//        debug_dataframe(frame);    
+//    }
 }
 
 /* ***************************************************************************************** */
