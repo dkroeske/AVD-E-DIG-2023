@@ -32,8 +32,57 @@ v1.0    Initial code
 #define DELAY   2
 
 uint8_t stepper_io[4] = {M1, M2, M3, M4};
-uint8_t stepper_sequence[] = {3, 6, 12, 9};
+uint8_t stepper_ccw[] = {3, 6, 12, 9};
+uint8_t stepper_cw[] = {9, 12, 6, 39};
 
+typedef enum {
+    cw,
+    ccw,
+} stepper_mode_t;
+
+typedef uint8_t stepper_speed_t;
+typedef uint16_t stepper_steps_t;
+
+stepper_mode_t stepper_mode = cw;
+stepper_speed_t stepper_speed = 2;
+stepper_steps_t stepper_steps = 0;
+
+void stepper_set_mode(stepper_mode_t mode) {
+    stepper_mode = mode;
+}
+
+void stepper_set_speed(stepper_speed_t speed) {
+    stepper_speed = speed;
+}
+
+void stepper_set_steps(stepper_steps_t steps) {
+    stepper_steps = steps;
+}
+
+void do_stepper(void) {
+    
+    uint8_t step_index = 0;
+    for( uint16_t idx = 0; idx < stepper_steps; idx++) {
+        
+            uint8_t seq = 0;
+            switch(stepper_mode) {
+                case cw:
+                    seq = stepper_cw[step_index];
+                    break;
+                case ccw:
+                    seq = stepper_ccw[step_index];
+                    break;
+            }
+            step_index++;
+            step_index%=4;
+
+            gpio_put(stepper_io[0], ((seq>>3)&0x01)); 
+            gpio_put(stepper_io[1], ((seq>>2)&0x01)); 
+            gpio_put(stepper_io[2], ((seq>>1)&0x01)); 
+            gpio_put(stepper_io[3], ((seq>>0)&0x01)); 
+            sleep_ms(stepper_speed);
+    }
+}
 
 // Main loop
 int main() {
@@ -50,24 +99,15 @@ int main() {
         gpio_put(stepper_io[idx], 0);
     }
 
-    uint8_t step_index = 0;
     while (true) {
+        
+        stepper_steps = 1000;
+        stepper_mode = cw;
+        stepper_speed = 100;
+        do_stepper();
 
-        for( uint16_t idx = 0; idx < 2048; idx++) {
-            
-            uint8_t seq = stepper_sequence[step_index];
-            step_index++;
-            step_index%=4;
+        sleep_ms(1000); 
 
-            gpio_put(stepper_io[0], ((seq>>3)&0x01)); 
-            gpio_put(stepper_io[1], ((seq>>2)&0x01)); 
-            gpio_put(stepper_io[2], ((seq>>1)&0x01)); 
-            gpio_put(stepper_io[3], ((seq>>0)&0x01)); 
-            sleep_ms(DELAY);
-        }
-
-        gpio_put(M1, 0); gpio_put(M2, 0); gpio_put(M3, 0); gpio_put(M4, 0);
-        while(1==1);
     }
 }
 
