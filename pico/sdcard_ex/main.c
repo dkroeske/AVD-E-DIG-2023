@@ -1,6 +1,7 @@
 /* *************************************************
 
-Test SD card reader/writer
+Test SD card reader/writer with flex and bison 
+config file parser
 
 Based on github.com/no-OS-FatFS-SDIO-SPI-RPI-Pico
  
@@ -10,9 +11,9 @@ v1.0    Initial code
 
 ***************************************************/
 
-
 #include "stdio.h"
 #include "stdlib.h"
+#include "string.h"
 #include "pico/stdlib.h"
 #include "hardware/clocks.h"
 #include "hardware/gpio.h"
@@ -22,57 +23,29 @@ v1.0    Initial code
 #include "rtc.h"
 #include "hw_config.h"
 
+#include "common.h"
+#include "config.h"
+
 // Main loop
 int main() {
 
     //
     stdio_init_all();
     time_init();
-    stdio_flush();
+//    stdio_flush();
     sleep_ms(2000);
 
-    //
-    sd_card_t *pSD = sd_get_by_num(0);  
-    FRESULT fr = f_mount(&pSD->fatfs, pSD->pcName, 1);
-    if( FR_OK != fr) {
-        panic("f_mount error: %s (%d)\n", FRESULT_str(fr), fr);
-    } 
-    
-/*
-    FIL fil;
-    const char* const filename = "test.txt";
-    fr = f_open(&fil, filename, FA_READ);
-    if( FR_OK != fr && FR_EXIST != fr) {
-        panic("f_open(%s) error: %s (%d)\n", filename, FRESULT_str(fr), fr);
+    // Read config from card
+    if( OK == config_init("config.txt") ) {
+        config_show();
+    } else {
+        printf("default config\n");
     }
 
-    char linebuf[40] = "";
-    while(NULL != f_gets(linebuf, 40, &fil)) {
-        printf("%s", linebuf);
-    }
-    f_close(&fil);
-*/
-
+    uint8_t x = 0;
     while(true){        
-    
-        FIL fil;
-        const char* const filename = "test.txt";
-        fr = f_open(&fil, filename, FA_READ);
-        if( FR_OK != fr && FR_EXIST != fr) {
-            panic("f_open(%s) error: %s (%d)\n", filename, FRESULT_str(fr), fr);
-        }
-
-        char linebuf[40] = "";
-        while(NULL != f_gets(linebuf, 40, &fil)) {
-            printf("%s", linebuf);
-        }
-        f_close(&fil);
-
-
-        printf("\n");
+        printf("0x%.2X\n", x++);
         sleep_ms(3000);
     }
-
-    f_unmount(pSD->pcName);
 }
 

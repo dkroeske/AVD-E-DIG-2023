@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "lex.yy.h"
+#include "config_lexer.h"
 
 int yyerror(CONFIG_STRUCT *config, char *msg);
 

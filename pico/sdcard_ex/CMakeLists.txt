@@ -25,21 +25,48 @@ add_compile_options(
     -Werror
 )
 
-add_subdirectory(./no-OS-FatFS/src build)
-add_subdirectory(./ly/src)
+add_subdirectory(no-OS-FatFS/src)
 
-add_executable(${PROJECT_NAME}
-    main.c
-    hw_config.c         # for SD card library
-)
+# Flex and Bison
 
-#
+find_package(FLEX REQUIRED)
+find_package(BISON REQUIRED)
+
+flex_target(CONFIG_LEXER
+    ./ly/src/config_lexer.l
+    "${CMAKE_CURRENT_BINARY_DIR}/config_lexer.c"
+    COMPILE_FLAGS "--header-file=lex.yy.h"
+    DEFINES_FILE ${CMAKE_CURRENT_BINARY_DIR}/config_lexer.h)
+
+
+bison_target(CONFIG_PARSER
+    ./ly/src/config_parser.y
+    "${CMAKE_CURRENT_BINARY_DIR}/config_parser.c"
+    COMPILE_FLAGS "--warnings=all --debug --verbose -d"
+    DEFINES_FILE ${CMAKE_CURRENT_BINARY_DIR}/config_parser.h)
+ 
+add_flex_bison_dependency(CONFIG_LEXER CONFIG_PARSER)
+
+# PIO
 #pico_generate_pio_header(${PROJECT_NAME}
 #    ${CMAKE_CURRENT_LIST_DIR}/ws2812.pio
 #)
 
 #
-pico_add_extra_outputs(${PROJECT_NAME})
+#pico_add_extra_outputs(${PROJECT_NAME})
+
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
+
+add_executable(${PROJECT_NAME}
+    main.c
+    hw_config.c         # for SD card library
+    ${CMAKE_CURRENT_BINARY_DIR}/config_lexer.c
+    ${CMAKE_CURRENT_BINARY_DIR}/config_parser.c
+    config.c
+)
+
+#
+target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
 #
 target_link_libraries(${PROJECT_NAME} 
