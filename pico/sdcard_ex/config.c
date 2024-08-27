@@ -61,6 +61,7 @@ RETVAL config_init(const char *file_name) {
 	    while( NULL != f_gets(line_buf, 80, &fp) ) {
 		strcat(buf, line_buf);
 	    }
+            printf("%s", buf);
 	    YY_BUFFER_STATE bs = yy_scan_buffer(buf, 1024);
 	    yy_switch_to_buffer(bs);
 	    yyparse(&config);
