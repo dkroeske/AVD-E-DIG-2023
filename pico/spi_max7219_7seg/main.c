@@ -24,7 +24,7 @@ v1.0    Initial code
 #include "hardware/gpio.h"
 #include "hardware/spi.h"
 
-//
+// Het aantal displays
 #define NR_7SEG_DISPLAYS 8
 
 // function prototyping
