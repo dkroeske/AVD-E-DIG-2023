@@ -1,9 +1,7 @@
 #
-# PICO IQ-NCO
+# Helloworld example
 #
-# 2024/09/01    dkroeske@gmail.com  Initial
-#
-#
+
 #
 cmake_minimum_required(VERSION 3.13)
 
@@ -12,7 +10,7 @@ include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
 include($ENV{PICO_SDK_PATH}/tools/CMakeLists.txt)
 
 # Projectnaam
-project(pico_iq_nco C CXX ASM)
+project(helloworld_pico2 C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
@@ -26,11 +24,12 @@ if (NOT DEFINED PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS)
     set(PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS 3000)
 endif()
 
+# Not working
+set(PICO_BOARD pico2)
+
 # 
 pico_sdk_init()
 
-#
-#set(PICO_BOARD pico2)
 
 #
 add_compile_options(
@@ -43,21 +42,12 @@ add_executable(${PROJECT_NAME}
 )
 
 #
-pico_generate_pio_header(${PROJECT_NAME}
-    ${CMAKE_CURRENT_LIST_DIR}/nco.pio
-)
-
-#
 pico_add_extra_outputs(${PROJECT_NAME})
 
 #
 target_link_libraries(${PROJECT_NAME} 
     pico_stdlib
     pico_stdio_usb
-    hardware_gpio
-    hardware_pio
-    hardware_dma
-    hardware_adc
 )
 
 #

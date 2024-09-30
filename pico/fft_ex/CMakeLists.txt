@@ -1,7 +1,7 @@
 #
-# PICO IQ-NCO
+# PICO fft example. Based on github.com/vha3/Hunter-Adams-RP2040-Demos
 #
-# 2024/09/01    dkroeske@gmail.com  Initial
+# 2024/09/28    dkroeske@gmail.com  Initial
 #
 #
 #
@@ -12,7 +12,7 @@ include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
 include($ENV{PICO_SDK_PATH}/tools/CMakeLists.txt)
 
 # Projectnaam
-project(pico_iq_nco C CXX ASM)
+project(pico_fft_ex C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
@@ -58,6 +58,7 @@ target_link_libraries(${PROJECT_NAME}
     hardware_pio
     hardware_dma
     hardware_adc
+    hardware_irq
 )
 
 #

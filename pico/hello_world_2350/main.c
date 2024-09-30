@@ -8,22 +8,23 @@
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
 
-#define LED 1
 #define SW  20
 
 int main() {
 
     stdio_init_all();
-    printf("Hello world, PICO style\n");
+    printf("Hello world, PICO-2 style\n");
 
     // Init all I/O
     gpio_init(SW);
     gpio_set_dir(SW, GPIO_IN);
     gpio_pull_up(SW);
-    
-    gpio_init(LED);
-    gpio_set_dir(LED, GPIO_OUT);
 
+    
+    // default led op het pico board
+    gpio_init(PICO_DEFAULT_LED_PIN);
+    gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
+    
     int sleep = 0;
     while (true) {
         
@@ -31,19 +32,17 @@ int main() {
             sleep = 1000;
             printf("Welkom E-jedi's!\n");
         } else {
-            sleep = 130;
-            printf("................\n");
+            sleep = 250;
+            printf("...............!\n");
         }       
 
         //LED on and wait
         sleep_ms(sleep);
-        gpio_put(LED, 0);
+        gpio_put(PICO_DEFAULT_LED_PIN, true);
         
         //LED off and wait
         sleep_ms(sleep);
-        gpio_put(LED, 1);
-        
-        //Just to inform user
-//        printf("+\n");
+        gpio_put(PICO_DEFAULT_LED_PIN, false);
     }
 }
+
