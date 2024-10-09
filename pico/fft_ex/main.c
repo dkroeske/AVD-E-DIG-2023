@@ -12,6 +12,7 @@
 #include "hardware/dma.h"
 #include "hardware/adc.h"
 #include "hardware/irq.h"
+#include "math.h"
 
 #include "nco.pio.h"
 
@@ -25,17 +26,17 @@
 uint16_t capture_buffer_I[CAPTURE_DEPTH];
 uint16_t capture_buffer_Q[CAPTURE_DEPTH];
 
-#define ADCCLK  48000000.0 // ADC clock 48 Mhz for PICO
-#define Fs          1000.0 // Sample frequency
-#define CLKDIV  1.0
+//#define ADCCLK  48000000.0 // ADC clock 48 Mhz for PICO
+//#define Fs          1000.0 // Sample frequency
 
 uint adc_dma_chan_I, adc_dma_chan_Q;
 dma_channel_config dma_chan_I_cfg, dma_chan_Q_cfg; 
 
+
 void dma_handler(uint8_t *buffer, int id){
-//    printf("ID: %d\n", id);
 }
 
+/*
 void _dma_handler() {
     
     if(dma_hw->ints0 & (1u << adc_dma_chan_I)) {
@@ -64,6 +65,7 @@ void _dma_handler() {
     
     printf("DMA IRQ \n");
 }
+*/
 
 void dma_handler_I() {
     dma_handler((uint8_t*)&capture_buffer_I, 0);
@@ -182,16 +184,28 @@ int main() {
         }
     }
 */
-    
+//    fix15 max_fr;
+//    int max_fr_dex;    
     
     while (true) {
         
 //        tight_loop_contents();
-        uint32_t start_time = time_us_32();
+//        uint32_t start_time = time_us_32();
         dma_channel_wait_for_finish_blocking(adc_dma_chan_I);
+        printf("I: ");
+        for(uint8_t idx = 0; idx < 20; idx++) {
+            printf("%.4X ", capture_buffer_I[idx]);
+        }
+        printf("\n");
+        
         dma_channel_wait_for_finish_blocking(adc_dma_chan_Q);
-        uint32_t busy_time = time_us_32() - start_time;
-        printf("Sampling IQ buffers (%d bytes): %ld [ms]\n", CAPTURE_DEPTH, busy_time/1000);
+        printf("Q: ");
+        for(uint8_t idx = 0; idx < 20; idx++) {
+            printf("%.4X ", capture_buffer_Q[CAPTURE_DEPTH-20+idx]);
+        }
+        printf("\n");
+//        uint32_t busy_time = time_us_32() - start_time;
+//        printf("Sampling IQ buffers (%d bytes): %ld [ms]\n", CAPTURE_DEPTH, busy_time/1000);
         
 //        nco_set_frequency(pio, sm, 419e3);
 //        printf("IQ clock = %f Hz\n", 419e3 );
