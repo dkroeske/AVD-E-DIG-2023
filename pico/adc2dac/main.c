@@ -9,9 +9,13 @@
 #include "hardware/gpio.h"
 //#include "hardware/clocks.h"
 //#include "hardware/pio.h"
-//#include "hardware/dma.h"
-//#include "hardware/adc.h"
+#include "hardware/dma.h"
+#include "hardware/adc.h"
 #include "hardware/pwm.h"
+#include "hardware/clocks.h"
+#include "hardware/irq.h"
+#include "hardware/sync.h"
+
 #include "math.h"
 
 // ADC
@@ -19,58 +23,189 @@
 //#define CAPTURE_DEPTH 1000
 //uint8_t capture_buf[CAPTURE_DEPTH];
 
+// Debug 
+#define DEBUG_LED       16
+
 // PWM
 #define PWM_GPIO_OUT    19 
-#define PWM_FREQ_KHZ    200
+#define PWM_FREQ_KHZ    500
 #define PWM_CLK_MHZ     125
 
 
-#define FS              10000
-#define SIN_TABLE_SIZE  100
-float sin_table[SIN_TABLE_SIZE];
+#define FS              220000 
+#define f1              1000
+#define f2              2000
+#define SIN_TABLE_SIZE  512
+uint8_t sin_table[SIN_TABLE_SIZE];
 
 void calc_sin_table() {
-    for( uint16_t idx = 0; idx < SIN_TABLE_SIZE; idx++) {
-        sin_table[idx] = sin(2.0 * 3.1415 * ((float)idx)/SIN_TABLE_SIZE);
+    for(uint16_t n = 0; n < 441; n++) {
+        sin_table[n] = (uint8_t) (126.0 + 
+            50.0 * sin(2.0 * 3.1415 * f1 * n / FS) + 
+            50.0 * sin(2.0 * 3.1415 * f2 * n / FS));
     }
+/*    for(uint16_t n = 0; n < 441; n++) {
+        printf("%d, %d\n", n, sin_table[n]);
+    }
+*/
 }
 
+#define ADC_BLOCK_SIZE 512
+uint16_t adc_ping_samples[ADC_BLOCK_SIZE];
+uint16_t adc_pong_samples[ADC_BLOCK_SIZE];
 
-void pwm_set_dc(uint slice, float dc){
-    uint16_t pwm_value = ((PWM_CLK_MHZ*1000*dc)/(PWM_FREQ_KHZ*100));
-    pwm_set_chan_level(slice, PWM_GPIO_OUT, pwm_value);
-//    printf("pwm value: %d (%.1f)\n", pwm_value, dc);
+uint adc_dma_ping;
+uint adc_dma_pong;
+dma_channel_config dma_ping_cfg;
+dma_channel_config dma_pong_cfg;
+
+uint16_t i = 0;
+uint16_t q = 0;
+uint16_t z = 0;
+
+
+//static void __isr __time_critical_func(dma_handler)() {
+void dma_handler() {
+    
+    gpio_put(DEBUG_LED, true);
+
+    if( dma_hw->ints0 & (1u << adc_dma_ping)) {
+        dma_channel_configure(
+            adc_dma_ping, 
+            &dma_ping_cfg, 
+            adc_ping_samples, 
+            &adc_hw->fifo,
+            ADC_BLOCK_SIZE,
+            false);
+        i++;        
+        dma_hw->ints0 = 1u << adc_dma_ping;
+    }
+    
+    if( dma_hw->ints0 & (1u << adc_dma_pong)) {
+        dma_channel_configure(
+            adc_dma_pong, 
+            &dma_pong_cfg, 
+            adc_pong_samples, 
+            &adc_hw->fifo,
+            ADC_BLOCK_SIZE,
+            false);
+        q++;
+        dma_hw->ints0 = 1u << adc_dma_pong;
+    }
+
+    z++;
+    sleep_us(2);
+    gpio_put(DEBUG_LED, false);
 }
 
 int main() {
 
     stdio_init_all();
-    printf("Experiment ADC to DAC\n");
+    printf("Experiment ADC to DAC with rp2040\n");
 
-    // pwm
-    gpio_set_function(PWM_GPIO_OUT, GPIO_FUNC_PWM);
-    uint slice = pwm_gpio_to_slice_num(PWM_GPIO_OUT);
-    uint channel = pwm_gpio_to_channel(PWM_GPIO_OUT);
-    pwm_set_wrap(slice, (PWM_CLK_MHZ*1000/PWM_FREQ_KHZ)); // No prescaler: fclk=125MHz, counter = fclk/fdc
-    //pwm_set_chan_level(slice, PWM_OUT, 875); // 21% -> 4167/100 * 21 = 875.07
-    pwm_set_dc(slice, 0.0); // 21% -> 4167/100 * 21 = 875.07
-    pwm_set_enabled(slice, true);
-    printf("PWM is running with slice: %d and channel: %d\n", slice, channel);
+    // Precalc signals 
+    // calc_sin_table();
 
     //
-    calc_sin_table();
+    uint f_sys_clk = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_SYS);
+    printf("frequency_count_khz = %d\n", f_sys_clk);
+
+    // debug
+    gpio_init(DEBUG_LED);
+    gpio_set_dir(DEBUG_LED, GPIO_OUT);
     
+    // adc
+    adc_init();
+    adc_gpio_init(26); 
+    adc_gpio_init(27);
+    adc_set_clkdiv(480); // Fs = 40kHz
+    hw_clear_bits(&adc_hw->fcs, ADC_FCS_UNDER_BITS);
+    hw_clear_bits(&adc_hw->fcs, ADC_FCS_OVER_BITS);
+    adc_fifo_setup(true, true, 1, false, false);
+    adc_select_input(0);
+    adc_set_round_robin(3);
+
+    /*
+    // pwm
+    gpio_set_function(PWM_GPIO_OUT, GPIO_FUNC_PWM);
+    uint slice_num = pwm_gpio_to_slice_num(PWM_GPIO_OUT);
+    pwm_config config = pwm_get_default_config();
+    pwm_config_set_clkdiv(&config, clk_div);
+    pwm_config_set_wrap(&config, 254);
+    */
+
+    // dma
+    adc_dma_ping = dma_claim_unused_channel(true);
+    adc_dma_pong = dma_claim_unused_channel(true);
+    dma_ping_cfg = dma_channel_get_default_config(adc_dma_ping);
+    dma_pong_cfg = dma_channel_get_default_config(adc_dma_pong);
+
+    channel_config_set_transfer_data_size(&dma_ping_cfg, DMA_SIZE_16);
+    channel_config_set_read_increment(&dma_ping_cfg, false);
+    channel_config_set_write_increment(&dma_ping_cfg, true);
+    channel_config_set_dreq(&dma_ping_cfg, DREQ_ADC);
+    channel_config_set_chain_to(&dma_ping_cfg, adc_dma_pong);
+    dma_channel_configure(
+        adc_dma_ping, 
+        &dma_ping_cfg, 
+        adc_ping_samples, 
+        &adc_hw->fifo, 
+        ADC_BLOCK_SIZE, 
+        false);
+    dma_channel_set_irq0_enabled(adc_dma_ping, true);
+
+    channel_config_set_transfer_data_size(&dma_pong_cfg, DMA_SIZE_16);
+    channel_config_set_read_increment(&dma_pong_cfg, false);
+    channel_config_set_write_increment(&dma_pong_cfg, true);
+    channel_config_set_dreq(&dma_pong_cfg, DREQ_ADC);
+    channel_config_set_chain_to(&dma_pong_cfg, adc_dma_ping);
+    dma_channel_configure(
+        adc_dma_pong, 
+        &dma_pong_cfg, 
+        adc_pong_samples, 
+        &adc_hw->fifo, 
+        ADC_BLOCK_SIZE, 
+        false);
+    dma_channel_set_irq0_enabled(adc_dma_pong, true);
+
+    dma_set_irq0_channel_mask_enabled((1u << adc_dma_ping) | (1u << adc_dma_pong), true);
+    irq_set_exclusive_handler(DMA_IRQ_0, dma_handler);
+    irq_set_enabled(DMA_IRQ_0, true);
+    
+    dma_start_channel_mask(1u << adc_dma_ping);
+    adc_run(true);
+
+
+    /*
+    // DMA
+    pwm_channel = dma_claim_unused_channel(true);
+    dma_channel_config dma_config  = dma_channel_get_default_config(pwm_channel);
+    channel_config_set_transfer_data_size(&dma_config, DMA_SIZE_8);
+    channel_config_set_read_increment(&dma_config, true);
+    channel_config_set_write_increment(&dma_config, false);
+    channel_config_set_dreq(&dma_config, DREQ_PWM_WRAP0);
+    dma_channel_configure(
+        pwm_channel,
+        &dma_config,
+        &pwm_hw->slice[slice_num].cc,
+        sin_table,
+        440,
+        false 
+    );
+
+    dma_channel_set_irq0_enabled(pwm_channel, true);
+    irq_set_exclusive_handler(DMA_IRQ_0, dma_isr);
+    irq_set_enabled(DMA_IRQ_0, true);
+
+    // Start DMA
+    dma_start_channel_mask(1u << pwm_channel);
+    */
+
+    uint16_t tmp = 0;    
     while (true) {
-        for(int16_t idx = 0; idx < SIN_TABLE_SIZE; idx++) {
-//            pwm_set_dc(slice, idx);
-            pwm_set_dc(slice, (uint8_t) (50.0 + 45.0 * sin_table[idx]));
-            sleep_us(4);
-//          sleep_ms(20);
-        }
-//        for(int16_t idx = 95; idx > 5 /*SIN_TABLE_SIZE */; idx--) {
-//            pwm_set_dc(slice, idx);
-//            sleep_us(4);
-//            sleep_ms(20);
-//        }
+        //dma_channel_wait_for_finish_blocking(adc_dma_ping);
+
+        printf("I: %.2d, Q: %.2d, (%.2d - %.2d)\n", i, q, z, tmp++);
+        sleep_ms(1000);            
     }
 }

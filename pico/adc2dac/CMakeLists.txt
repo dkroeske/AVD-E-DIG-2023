@@ -58,6 +58,10 @@ target_link_libraries(${PROJECT_NAME}
     hardware_dma
     hardware_adc
     hardware_pwm
+    hardware_sync
+    hardware_clocks
+    hardware_irq
+    hardware_adc
 )
 
 #
