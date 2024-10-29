@@ -31,8 +31,15 @@
 #define PWM_FREQ_KHZ    500
 #define PWM_CLK_MHZ     125
 
+// ADC
+#define F_ADC           48000000
+#define FS_ADC            100000
+#define ADC_CLKDIV      F_ADC/FS_ADC
+
+
 
 #define FS              220000 
+
 #define f1              1000
 #define f2              2000
 #define SIN_TABLE_SIZE  512
@@ -50,19 +57,20 @@ void calc_sin_table() {
 */
 }
 
-#define ADC_BLOCK_SIZE 512
-uint16_t adc_ping_samples[ADC_BLOCK_SIZE];
-uint16_t adc_pong_samples[ADC_BLOCK_SIZE];
+#define ADC_CAPTURE_DEPTH 10000
+uint8_t adc_ping_samples[ADC_CAPTURE_DEPTH];
+uint8_t adc_pong_samples[ADC_CAPTURE_DEPTH];
+
+uint8_t adc_debug_ping[ADC_CAPTURE_DEPTH];
+uint8_t adc_debug_pong[ADC_CAPTURE_DEPTH];
+bool first_ping = true;
+bool first_pong = true;
+
 
 uint adc_dma_ping;
 uint adc_dma_pong;
 dma_channel_config dma_ping_cfg;
 dma_channel_config dma_pong_cfg;
-
-uint16_t i = 0;
-uint16_t q = 0;
-uint16_t z = 0;
-
 
 //static void __isr __time_critical_func(dma_handler)() {
 void dma_handler() {
@@ -75,9 +83,14 @@ void dma_handler() {
             &dma_ping_cfg, 
             adc_ping_samples, 
             &adc_hw->fifo,
-            ADC_BLOCK_SIZE,
+            ADC_CAPTURE_DEPTH,
             false);
-        i++;        
+    
+        if( first_ping ) {
+            memcpy(adc_debug_ping, adc_ping_samples, ADC_CAPTURE_DEPTH);
+            first_ping = false;
+        }
+
         dma_hw->ints0 = 1u << adc_dma_ping;
     }
     
@@ -87,13 +100,17 @@ void dma_handler() {
             &dma_pong_cfg, 
             adc_pong_samples, 
             &adc_hw->fifo,
-            ADC_BLOCK_SIZE,
+            ADC_CAPTURE_DEPTH,
             false);
-        q++;
+    
+        if( first_pong ) {
+            memcpy(adc_debug_pong, adc_pong_samples, ADC_CAPTURE_DEPTH);
+            first_pong = false;
+        }
+    
         dma_hw->ints0 = 1u << adc_dma_pong;
     }
 
-    z++;
     sleep_us(2);
     gpio_put(DEBUG_LED, false);
 }
@@ -118,10 +135,16 @@ int main() {
     adc_init();
     adc_gpio_init(26); 
     adc_gpio_init(27);
-    adc_set_clkdiv(480); // Fs = 40kHz
-    hw_clear_bits(&adc_hw->fcs, ADC_FCS_UNDER_BITS);
-    hw_clear_bits(&adc_hw->fcs, ADC_FCS_OVER_BITS);
-    adc_fifo_setup(true, true, 1, false, false);
+    adc_set_clkdiv(ADC_CLKDIV); // Fs = 40kHz
+//    hw_clear_bits(&adc_hw->fcs, ADC_FCS_UNDER_BITS);
+//    hw_clear_bits(&adc_hw->fcs, ADC_FCS_OVER_BITS);
+    adc_fifo_setup(
+        true,   // Write to fifo
+        true,  
+        1, 
+        false, 
+        true    //
+    );
     adc_select_input(0);
     adc_set_round_robin(3);
 
@@ -140,7 +163,7 @@ int main() {
     dma_ping_cfg = dma_channel_get_default_config(adc_dma_ping);
     dma_pong_cfg = dma_channel_get_default_config(adc_dma_pong);
 
-    channel_config_set_transfer_data_size(&dma_ping_cfg, DMA_SIZE_16);
+    channel_config_set_transfer_data_size(&dma_ping_cfg, DMA_SIZE_8);
     channel_config_set_read_increment(&dma_ping_cfg, false);
     channel_config_set_write_increment(&dma_ping_cfg, true);
     channel_config_set_dreq(&dma_ping_cfg, DREQ_ADC);
@@ -150,11 +173,11 @@ int main() {
         &dma_ping_cfg, 
         adc_ping_samples, 
         &adc_hw->fifo, 
-        ADC_BLOCK_SIZE, 
+        ADC_CAPTURE_DEPTH, 
         false);
     dma_channel_set_irq0_enabled(adc_dma_ping, true);
 
-    channel_config_set_transfer_data_size(&dma_pong_cfg, DMA_SIZE_16);
+    channel_config_set_transfer_data_size(&dma_pong_cfg, DMA_SIZE_8);
     channel_config_set_read_increment(&dma_pong_cfg, false);
     channel_config_set_write_increment(&dma_pong_cfg, true);
     channel_config_set_dreq(&dma_pong_cfg, DREQ_ADC);
@@ -164,7 +187,7 @@ int main() {
         &dma_pong_cfg, 
         adc_pong_samples, 
         &adc_hw->fifo, 
-        ADC_BLOCK_SIZE, 
+        ADC_CAPTURE_DEPTH, 
         false);
     dma_channel_set_irq0_enabled(adc_dma_pong, true);
 
@@ -203,9 +226,32 @@ int main() {
 
     uint16_t tmp = 0;    
     while (true) {
-        //dma_channel_wait_for_finish_blocking(adc_dma_ping);
+//        dma_channel_wait_for_finish_blocking(adc_dma_ping);
+        // Print ping buffer
 
-        printf("I: %.2d, Q: %.2d, (%.2d - %.2d)\n", i, q, z, tmp++);
-        sleep_ms(1000);            
+        sleep_ms(2000);
+
+        printf("\nping:\n");
+        for(uint16_t idx = 0; idx < ADC_CAPTURE_DEPTH; idx++) {
+            printf("%d,", adc_debug_ping[idx]);
+            if(idx % 16 == 15) {
+                printf("\n");
+            }
+        }
+        
+        printf("\npong:\n");
+        for(uint16_t idx = 0; idx < ADC_CAPTURE_DEPTH; idx++) {
+            printf("%d,", adc_debug_pong[idx]);
+            if(idx % 16 == 15) {
+                printf("\n");
+            }
+        }
+    
+    
+        while(1) {
+
+            printf("(%.2d)\n", tmp++);
+            sleep_ms(1000);            
+        }
     }
 }
