@@ -37,13 +37,13 @@
 #define f1              1000
 #define f2              2000
 #define SIN_TABLE_SIZE  512
-uint8_t sin_table[SIN_TABLE_SIZE];
+uint16_t sin_table[ADC_CAPTURE_DEPTH];
 
 void calc_sin_table() {
-    for(uint16_t n = 0; n < 441; n++) {
+    for(uint16_t n = 0; n < ADC_CAPTURE_DEPTH; n++) {
         sin_table[n] = (uint8_t) (126.0 + 
             50.0 * sin(2.0 * 3.1415 * f1 * n / FS) + 
-            50.0 * sin(2.0 * 3.1415 * f2 * n / FS));
+            0.0 * sin(2.0 * 3.1415 * f2 * n / FS));
     }
 /*    for(uint16_t n = 0; n < 441; n++) {
         printf("%d, %d\n", n, sin_table[n]);
@@ -51,19 +51,23 @@ void calc_sin_table() {
 */
 }
 
-uint8_t adc_ping_samples[ADC_CAPTURE_DEPTH];
-uint8_t adc_pong_samples[ADC_CAPTURE_DEPTH];
-
-uint8_t adc_debug_ping[ADC_CAPTURE_DEPTH];
-uint8_t adc_debug_pong[ADC_CAPTURE_DEPTH];
-bool first_ping = true;
-bool first_pong = true;
-
+uint16_t adc_ping_samples[ADC_CAPTURE_DEPTH];
+uint16_t adc_pong_samples[ADC_CAPTURE_DEPTH];
 
 uint adc_dma_ping;
 uint adc_dma_pong;
 dma_channel_config dma_ping_cfg;
 dma_channel_config dma_pong_cfg;
+
+// audio out
+uint16_t pwm_ping[ADC_CAPTURE_DEPTH];
+uint16_t pwm_pong[ADC_CAPTURE_DEPTH];
+uint pwm_dma_ping;
+uint pwm_dma_pong;
+dma_channel_config pwm_ping_cfg;
+dma_channel_config pwm_pong_cfg;
+int pwm_slice_num;
+
 
 //static void __isr __time_critical_func(dma_handler)() {
 void dma_handler() {
@@ -78,10 +82,14 @@ void dma_handler() {
             ADC_CAPTURE_DEPTH,
             false);
     
-        if( first_ping ) {
-            memcpy(adc_debug_ping, adc_ping_samples, ADC_CAPTURE_DEPTH);
-            first_ping = false;
-        }
+        dma_channel_configure(
+            pwm_dma_pong, &pwm_pong_cfg,
+            &pwm_hw->slice[pwm_slice_num].cc,
+            adc_ping_samples, 
+            ADC_CAPTURE_DEPTH,
+            true
+        );
+
 
         dma_hw->ints0 = 1u << adc_dma_ping;
         
@@ -99,11 +107,14 @@ void dma_handler() {
             ADC_CAPTURE_DEPTH,
             false);
     
-        if( first_pong ) {
-            memcpy(adc_debug_pong, adc_pong_samples, ADC_CAPTURE_DEPTH);
-            first_pong = false;
-        }
-    
+        dma_channel_configure(
+            pwm_dma_ping, &pwm_ping_cfg,
+            &pwm_hw->slice[pwm_slice_num].cc,
+            adc_pong_samples, 
+            ADC_CAPTURE_DEPTH,
+            true
+        );
+
         dma_hw->ints0 = 1u << adc_dma_pong;
     }
 }
@@ -114,7 +125,7 @@ int main() {
     printf("Experiment ADC to DAC with rp2040\n");
 
     // Precalc signals 
-    // calc_sin_table();
+    calc_sin_table();
 
     //
     uint f_sys_clk = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_SYS);
@@ -136,27 +147,29 @@ int main() {
         true,  
         1, 
         false, 
-        true    //
+        false    //
     );
     adc_select_input(1);
 //    adc_set_round_robin(3);
 
-    /*
+    
     // pwm
     gpio_set_function(PWM_GPIO_OUT, GPIO_FUNC_PWM);
-    uint slice_num = pwm_gpio_to_slice_num(PWM_GPIO_OUT);
+    gpio_set_drive_strength(PWM_GPIO_OUT, GPIO_DRIVE_STRENGTH_12MA);
+    pwm_slice_num = pwm_gpio_to_slice_num(PWM_GPIO_OUT);
     pwm_config config = pwm_get_default_config();
-    pwm_config_set_clkdiv(&config, clk_div);
-    pwm_config_set_wrap(&config, 254);
-    */
+    pwm_config_set_clkdiv(&config, 1.f);
+    pwm_config_set_wrap(&config, 255);
+    pwm_init(pwm_slice_num, &config, true);
+    
 
-    // dma
+    // dma adc
     adc_dma_ping = dma_claim_unused_channel(true);
     adc_dma_pong = dma_claim_unused_channel(true);
     dma_ping_cfg = dma_channel_get_default_config(adc_dma_ping);
     dma_pong_cfg = dma_channel_get_default_config(adc_dma_pong);
 
-    channel_config_set_transfer_data_size(&dma_ping_cfg, DMA_SIZE_8);
+    channel_config_set_transfer_data_size(&dma_ping_cfg, DMA_SIZE_16);
     channel_config_set_read_increment(&dma_ping_cfg, false);
     channel_config_set_write_increment(&dma_ping_cfg, true);
     channel_config_set_dreq(&dma_ping_cfg, DREQ_ADC);
@@ -170,7 +183,7 @@ int main() {
         false);
     dma_channel_set_irq0_enabled(adc_dma_ping, true);
 
-    channel_config_set_transfer_data_size(&dma_pong_cfg, DMA_SIZE_8);
+    channel_config_set_transfer_data_size(&dma_pong_cfg, DMA_SIZE_16);
     channel_config_set_read_increment(&dma_pong_cfg, false);
     channel_config_set_write_increment(&dma_pong_cfg, true);
     channel_config_set_dreq(&dma_pong_cfg, DREQ_ADC);
@@ -184,6 +197,23 @@ int main() {
         false);
     dma_channel_set_irq0_enabled(adc_dma_pong, true);
 
+    // dma pwm
+    pwm_dma_ping = dma_claim_unused_channel(true);
+    pwm_dma_pong = dma_claim_unused_channel(true);
+    pwm_ping_cfg = dma_channel_get_default_config(pwm_dma_ping);
+    pwm_pong_cfg = dma_channel_get_default_config(pwm_dma_pong);
+    
+    channel_config_set_transfer_data_size(&pwm_ping_cfg, DMA_SIZE_32);
+    channel_config_set_read_increment(&pwm_ping_cfg, true);
+    channel_config_set_write_increment(&pwm_ping_cfg, false);
+    channel_config_set_dreq(&pwm_ping_cfg, DREQ_PWM_WRAP0 + pwm_slice_num);
+    
+    channel_config_set_transfer_data_size(&pwm_pong_cfg, DMA_SIZE_32);
+    channel_config_set_read_increment(&pwm_pong_cfg, true);
+    channel_config_set_write_increment(&pwm_pong_cfg, false);
+    channel_config_set_dreq(&pwm_pong_cfg, DREQ_PWM_WRAP0 + pwm_slice_num);
+
+    // adc isr
     dma_set_irq0_channel_mask_enabled((1u << adc_dma_ping) | (1u << adc_dma_pong), true);
     irq_set_exclusive_handler(DMA_IRQ_0, dma_handler);
     irq_set_enabled(DMA_IRQ_0, true);
@@ -192,58 +222,15 @@ int main() {
     adc_run(true);
 
 
-    /*
-    // DMA
-    pwm_channel = dma_claim_unused_channel(true);
-    dma_channel_config dma_config  = dma_channel_get_default_config(pwm_channel);
-    channel_config_set_transfer_data_size(&dma_config, DMA_SIZE_8);
-    channel_config_set_read_increment(&dma_config, true);
-    channel_config_set_write_increment(&dma_config, false);
-    channel_config_set_dreq(&dma_config, DREQ_PWM_WRAP0);
-    dma_channel_configure(
-        pwm_channel,
-        &dma_config,
-        &pwm_hw->slice[slice_num].cc,
-        sin_table,
-        440,
-        false 
-    );
-
-    dma_channel_set_irq0_enabled(pwm_channel, true);
-    irq_set_exclusive_handler(DMA_IRQ_0, dma_isr);
-    irq_set_enabled(DMA_IRQ_0, true);
-
-    // Start DMA
-    dma_start_channel_mask(1u << pwm_channel);
-    */
-
-//    uint16_t tmp = 0;    
+    uint16_t tmp = 0;    
     while (true) {
 //        dma_channel_wait_for_finish_blocking(adc_dma_ping);
         // Print ping buffer
 
         sleep_ms(2000);
 
-//        printf("\nping:\n");
-//        for(uint16_t idx = 0; idx < ADC_CAPTURE_DEPTH; idx++) {
-//            printf("%d,", adc_debug_ping[idx]);
-//            if(idx % 16 == 15) {
-//                printf("\n");
-//            }
-//        }
-        
-        printf("\npong:\n");
-        for(uint16_t idx = 1; idx < ADC_CAPTURE_DEPTH; idx+=2) {
-            printf("%d,", adc_debug_pong[idx]);
-            if(idx % 16 == 15) {
-                printf("\n");
-            }
-        }
-    
-    
         while(1) {
-
-//            printf("(%.2d)\n", tmp++);
+            printf("(%.2d)\n", tmp++);
             sleep_ms(1000);            
         }
     }
