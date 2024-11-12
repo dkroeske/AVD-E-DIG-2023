@@ -32,7 +32,7 @@ int main() {
             printf("Welkom E-jedi's!\n");
         } else {
             sleep = 130;
-            printf("................\n");
+            printf("++++++.\n");
         }       
 
         //LED on and wait

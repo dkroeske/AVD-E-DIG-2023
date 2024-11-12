@@ -35,10 +35,15 @@ pico_sdk_init()
 add_compile_options(
     -Wall
     -Werror
+    -O0
+    -g
 )
 
 add_executable(${PROJECT_NAME}
     main.c
+    sampler.c
+#    pcm5102.c
+    pwm_audio.c
 )
 
 #
