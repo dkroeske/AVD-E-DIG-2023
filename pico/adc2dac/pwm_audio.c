@@ -31,15 +31,10 @@ int dma_data_channel;
 int dma_ctrl_channel;
 
 
-//#define FS      44000
-//#define f1      1000
-//#define f2   1500
-//#define BLK_SIZE 176
+#define PWM_AUDIO_BUF_SIZE  8192
 
-#define PWM_AUDIO_BUF_SIZE  1024
-
-unsigned short wave_table[PWM_AUDIO_BUF_SIZE] = {0,};
-unsigned short dbuf[PWM_AUDIO_BUF_SIZE] = {0,};
+uint8_t wave_table[PWM_AUDIO_BUF_SIZE] = {0,};
+uint8_t dbuf[PWM_AUDIO_BUF_SIZE] = {0,};
 unsigned int buf_index = 0;
 bool new_data = false;
 uint8_t repeat_value = 0;
@@ -67,7 +62,7 @@ static void __isr __time_critical_func(pwm_audio_isr)() {
     }
 }
 
-void pwm_audio_write(unsigned short *buf, size_t l)
+void pwm_audio_write(uint8_t *buf, size_t l)
 {
     memcpy(wave_table, buf, l);
     new_data = true;

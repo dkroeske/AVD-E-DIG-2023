@@ -19,11 +19,13 @@
 
 
 void on_adc_dma_ping(uint8_t *buf) {
-//    puts("ping");
+    pwm_audio_write(buf, 8192);
+    puts("ping");
 }
 
 void on_adc_dma_pong(uint8_t *buf) {
-//    puts("pong");
+    pwm_audio_write(buf, 8192);
+    puts("pong");
 }
 
 

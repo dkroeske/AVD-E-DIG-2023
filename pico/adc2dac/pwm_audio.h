@@ -43,7 +43,7 @@ GPIO #19    Audio RIGHT
 //#define BLK_SIZE 176
 
 //unsigned short *address_pointer = &wave_table[0];
-void pwm_audio_write(unsigned short *buf, size_t l);
+void pwm_audio_write(uint8_t *buf, size_t l);
 
 /* ****************************************************** */
 void pwm_audio_init();

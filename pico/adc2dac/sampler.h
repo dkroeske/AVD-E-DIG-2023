@@ -27,9 +27,9 @@ ADC ping/pong sampler using dma with callback
 
 // ADC
 #define F_ADC           48000000
-#define FS_ADC            100000
+#define FS_ADC             11000
 #define ADC_CLKDIV  F_ADC/FS_ADC
-#define ADC_CAPTURE_DEPTH  10000 
+#define ADC_CAPTURE_DEPTH   8192*2 
 
 
 /* ****************************************************** */
