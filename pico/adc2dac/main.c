@@ -27,7 +27,6 @@ void on_adc_dma_pong(uint8_t *buf) {
 }
 
 
-
 int main() {
 
     stdio_init_all();
@@ -41,12 +40,10 @@ int main() {
     pwm_audio_init();
     pwm_audio_start();
 
-
     // Init adc in dma mode
     adc_dma_set_ping_cb(&on_adc_dma_ping);
     adc_dma_set_pong_cb(&on_adc_dma_pong);
     adc_dma_init();
-            
 
     uint16_t tmp = 0;   
     sleep_ms(2000); 
