@@ -36,14 +36,20 @@ GPIO #19    Audio RIGHT
 
 #define PWM_AUDIO_DEBUG 1
 
+#define PWM_CLK             125000000
+#define PWM_M               16
+#define PWM_WRAP            254
+#define PWM_FS              11000    
+#define PWM_CLKDIV  ((float)(PWM_CLK))/(PWM_M*PWM_WRAP*PWM_FS)
 
-//#define FS      44000
-//#define f1      1000
-//#define f2   1500
-//#define BLK_SIZE 176
-
-//unsigned short *address_pointer = &wave_table[0];
+/* ****************************************************** */
 void pwm_audio_write(uint8_t *buf, size_t l);
+/*
+short   : 
+inputs  : 
+outputs :
+notes   :
+***********************************************************/
 
 /* ****************************************************** */
 void pwm_audio_init();

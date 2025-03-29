@@ -17,15 +17,37 @@
 #include "sampler.h"
 #include "pwm_audio.h"
 
+typedef struct {
+    uint8_t left[8192];
+    uint8_t right[8192];
+} audio_buf;
+
+bool ping = false;
+bool pong = false;
+
+audio_buf ab;
+uint16_t i = 0;
 
 void on_adc_dma_ping(uint8_t *buf) {
-    pwm_audio_write(buf, 8192);
-    puts("ping");
+
+//    i = 0;
+//    for(uint16_t idx = 0; idx < ADC_CAPTURE_DEPTH; idx+=2 ) {
+//        ab.left[i] = buf[idx];
+//        ab.right[i] = buf[idx+1];
+//        i++;
+//    }
+    ping = true;
 }
 
 void on_adc_dma_pong(uint8_t *buf) {
-    pwm_audio_write(buf, 8192);
-    puts("pong");
+
+//    i = 0;    
+//    for(uint16_t idx = 0; idx < ADC_CAPTURE_DEPTH; idx+=2 ) {
+//        ab.left[i] = buf[idx];
+//        ab.right[i] = buf[idx+1];
+//        i++;
+//    }
+    pong = true;
 }
 
 
@@ -47,13 +69,19 @@ int main() {
     adc_dma_set_pong_cb(&on_adc_dma_pong);
     adc_dma_init();
 
-    uint16_t tmp = 0;   
     sleep_ms(2000); 
     while (true) {
     
-//            dma_channel_wait_for_finish_blocking(adc_dma_ping);
-//            dma_channel_wait_for_finish_blocking(adc_dma_pong);
-        printf("%.4X\n", tmp++);
-        sleep_ms(1000);
+        if(ping) {
+//            pwm_audio_write(ab.left, 8192);
+//            puts("ping");
+//            ping = false;
+        }
+
+        if(pong) {
+//            pwm_audio_write(ab.left, 8192);
+//            puts("pong");
+//            pong = false;
+        }
     }
 }

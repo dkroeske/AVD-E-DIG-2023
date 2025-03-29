@@ -61,6 +61,7 @@ version : DMK - initial version
         }
         
 #ifdef ADC_DMA_DEBUG        
+        sleep_us(4);
         gpio_put(DEBUG_LED_PING, false);
 #endif
     }
@@ -82,13 +83,11 @@ version : DMK - initial version
         }
         
 #ifdef ADC_DMA_DEBUG        
+        sleep_us(4);
         gpio_put(DEBUG_LED_PONG, false);
 #endif
     }
 }
-
-
-
 
 
 /* ****************************************************** */
@@ -108,14 +107,15 @@ version : DMK - initial version
     gpio_init(DEBUG_LED_PONG);
     gpio_set_dir(DEBUG_LED_PONG, GPIO_OUT);
 
-    printf("adc_dma_init() debug @GPIO:\n\tping %d\n\tpong %d\n", DEBUG_LED_PING, DEBUG_LED_PONG);
+    printf("adc_dma_init() debug @GPIO:\n\tping %d\n\tpong %d\n\tADC_CLKDIV %f\n", DEBUG_LED_PING, DEBUG_LED_PONG, ADC_CLKDIV);
 #endif
     
     // init adc
     adc_init();
     adc_gpio_init(26); 
-    adc_gpio_init(27);
-    adc_set_clkdiv(480.0); //ADC_CLKDIV); // Fs = 40kHz
+//    adc_gpio_init(27);
+    //adc_set_clkdiv(ADC_CLKDIV); // Fs = 40kHz
+    adc_set_clkdiv(24000.0); // Fs = 40kHz
     hw_clear_bits(&adc_hw->fcs, ADC_FCS_UNDER_BITS);
     hw_clear_bits(&adc_hw->fcs, ADC_FCS_OVER_BITS);
     adc_fifo_setup(
@@ -126,7 +126,7 @@ version : DMK - initial version
         true    // Shift 12bits -> 8bits
     );
     adc_select_input(0);
-    adc_set_round_robin(3);
+//    adc_set_round_robin(3);
 
     // dma adc
     adc_dma_ping = dma_claim_unused_channel(true);

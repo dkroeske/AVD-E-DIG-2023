@@ -1,8 +1,7 @@
 #
-# PICO ADC2DAC - ADC to DAC (pwm) experiment for digital filtering
+# PICO DMA testing
 #
-# 2024/10/12    dkroeske@gmail.com  Initial
-# 2025/03/25    dkroeske@gmail.com  Remove pcm5102
+# 2024/10/22    dkroeske@gmail.com  Initial
 #
 #
 cmake_minimum_required(VERSION 3.13)
@@ -12,7 +11,7 @@ include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
 include($ENV{PICO_SDK_PATH}/tools/CMakeLists.txt)
 
 # Projectnaam
-project(adc2dac C CXX ASM)
+project(dma_ex2 C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
@@ -42,8 +41,6 @@ add_compile_options(
 
 add_executable(${PROJECT_NAME}
     main.c
-    sampler.c
-    pwm_audio.c
 )
 
 #
@@ -61,11 +58,10 @@ target_link_libraries(${PROJECT_NAME}
     hardware_gpio
     hardware_pio
     hardware_dma
-    hardware_adc
-    hardware_pwm
     hardware_sync
     hardware_clocks
     hardware_irq
+    hardware_pwm
     hardware_adc
 )
 

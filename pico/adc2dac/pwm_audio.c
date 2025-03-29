@@ -43,7 +43,7 @@ static void __isr __time_critical_func(pwm_audio_isr)() {
     
     // if new data copy to buf
     if(new_data) {
-        memcpy(dbuf, wave_table, PWM_AUDIO_BUF_SIZE * sizeof(unsigned short));
+        memcpy(dbuf, wave_table, PWM_AUDIO_BUF_SIZE * sizeof(uint8_t));
         new_data = false;
         buf_index = 0;
     }
@@ -55,7 +55,7 @@ static void __isr __time_critical_func(pwm_audio_isr)() {
     
     // update buffer index. increase after 16 times
     repeat_value++;
-    repeat_value%=16;
+    repeat_value%=32;
     if(!repeat_value) {
         buf_index++;
         buf_index%=PWM_AUDIO_BUF_SIZE;   
@@ -86,21 +86,21 @@ notes   :
 {
 
 #ifdef PWM_AUDIO_DEBUG
-    printf("PWM_AUDIO init. Buffer size %u\n", sizeof(dbuf));
+    printf("PWM_AUDIO init. Buffer size %u. PWM_CLKDIV %f\n", sizeof(dbuf), PWM_CLKDIV);
     test_data();
 #endif
 
     // 
-    uint f_sys_clk = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_SYS);
-    printf("frequency_count_khz = %d\n", f_sys_clk);
+//    uint f_sys_clk = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_SYS);
+//    printf("frequency_count_khz = %d\n", f_sys_clk);
 
     // pwm
     gpio_set_function(PWM_RIGHT_GPIO_OUT, GPIO_FUNC_PWM);
     gpio_set_drive_strength(PWM_RIGHT_GPIO_OUT, GPIO_DRIVE_STRENGTH_12MA);
     uint slice_num = pwm_gpio_to_slice_num(PWM_RIGHT_GPIO_OUT);
     pwm_config pc = pwm_get_default_config();
-    pwm_config_set_clkdiv(&pc, 3.076);
-    pwm_config_set_wrap(&pc, 254);
+    pwm_config_set_clkdiv(&pc, PWM_CLKDIV);
+    pwm_config_set_wrap(&pc, PWM_WRAP);
     pwm_init(slice_num, &pc, true);
 
     // set pwm irq    
