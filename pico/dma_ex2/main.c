@@ -27,7 +27,7 @@ dma_channel_config dma_pwm_config;
 #define PWM_GPIO_OUT    19 //PICO_DEFAULT_LED_PIN
 #define DEBUG_PIN_PING  17
 #define DEBUG_PIN_PONG  16
-#define BLOCK_SIZE      64 
+#define BLOCK_SIZE      254 
 
 #define DMA_DEBUG
 
@@ -100,8 +100,11 @@ int main() {
     printf("frequency_count_khz = %d\n", f_sys_clk);
 
     //
-    for(uint16_t idx = 0; idx < BLOCK_SIZE*32; idx++) {
-        pwm[idx] = (uint16_t) (127.0f + 100.0f * sin( (2.0f * M_PI * 90 * idx) / (BLOCK_SIZE*32))) ;
+    for(uint16_t idx = 0; idx < BLOCK_SIZE; idx++) {
+        uint16_t u = (uint16_t) (127.0f + 100.0f * sin( (2.0f * M_PI * 1.0f  * idx) / BLOCK_SIZE)) ;
+        for(uint16_t idy = 0; idy < 32; idy++) {
+            pwm[32*idx+idy] = u;
+        }
     }
 
     // PWM 
@@ -109,7 +112,8 @@ int main() {
     gpio_set_drive_strength(PWM_GPIO_OUT, GPIO_DRIVE_STRENGTH_12MA);
     uint slice_num = pwm_gpio_to_slice_num(PWM_GPIO_OUT);
     pwm_config pc = pwm_get_default_config();
-    pwm_config_set_clkdiv(&pc, 3.845f); // 
+    float div = (f_sys_clk * 1.0f) / (254.0 * 260); 
+    pwm_config_set_clkdiv(&pc, div); // 
     pwm_config_set_wrap(&pc,  254);
     pwm_init(slice_num, &pc, true);
 
