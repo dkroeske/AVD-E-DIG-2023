@@ -62,7 +62,7 @@ add_compile_options(
 add_executable(${PROJECT_NAME}
     main.c
     process.c
-    fir.c
+    bandpass.c
 )
 
 #

@@ -2,7 +2,8 @@
 //
 #include "stdio.h"
 #include "process.h"
-#include "fir.h"
+//#include "fir.h"
+#include "bandpass.h"
 
 //
 float fft_inp_4khz[BLOCK_SIZE];
@@ -34,13 +35,15 @@ void samples_to_float(const uint16_t *src, float *dest, uint16_t size, float sca
     }
 }
 
-extern const float ConvDirect_Kernel[CONVDIRECT_KERNEL_LENGHT];
+// used for fir
 float fir_in[BLOCK_SIZE];
+float fir_out[BLOCK_SIZE];
 
-ConvDirect_Container c; 
+// Handle to the fir instances
+fir_handle_t bpf;
 
-void process_init() {
-    ConvDirect_Init(&c, ConvDirect_Kernel);
+void process_init(){
+    bpf = fir_init(bpf_coeffs, 17, BLOCK_SIZE, 1.0);
 }
 
 // Entry point of processing. 
@@ -49,14 +52,31 @@ void process(const uint16_t *inp, uint16_t *outp, uint16_t size) {
     // Convert samples to float
     samples_to_float(inp, fir_in, BLOCK_SIZE, 255.0f);
 
-    // do filter
-    ConvDirect_Update( &c, fir_in);
+    // Remove DC -> Highpass fc = 400Hz
+//    ConvDirect_Update( &c, fir_in);
+    fir_update(bpf, fir_in, fir_out, BLOCK_SIZE);
+
+    // fsk demodulate:
+
+    // Calculate Q: multiply with cos() and lowpass xxx Hz
+    
+
+    // Calculate I: multiply with -sin() and lowpass xxx Hz
+
+    // Calculate z=a+bj
+    
+    // multiply y[n] = z[n] * conjugate(z[n-1])
+    
+    // calculate phase from y[n]
+
+    // If phase <= 0? bit = 0; bit = 1; 
+
+    // decode bit-stream
 
     // Convert back to uint16_t for pwm
     for(uint16_t idx = 0; idx < size; idx++) {
         for(uint16_t idy = 0; idy < 32; idy++) {
-            outp[32*idx+idy] = (uint16_t) (127.0f + c.out[idx] * 255.0f);
-    //        outp[32*idx+idy] = (uint16_t) (127.0f + fir_in[idx] * 255.0f);
+            outp[32*idx+idy] = (uint16_t) (127.0f + fir_out[idx] * 255.0f);
         }
     }
 
