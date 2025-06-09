@@ -4,6 +4,7 @@
 #include "process.h"
 //#include "fir.h"
 #include "bandpass.h"
+#include "math.h"
 
 //
 float fft_inp_4khz[BLOCK_SIZE];
@@ -40,10 +41,29 @@ float fir_in[BLOCK_SIZE];
 float fir_out[BLOCK_SIZE];
 
 // Handle to the fir instances
-fir_handle_t bpf;
+fir_handle_t bpf, q_lpf, i_lpf;
+
+
+float cos_t[BLOCK_SIZE];
+float msin_t[BLOCK_SIZE];
+
+float q[BLOCK_SIZE];
+float i[BLOCK_SIZE];
+float z[BLOCK_SIZE * 2];
+float z_conj[BLOCK_SIZE * 2];
+float y[BLOCK_SIZE*2];
+
 
 void process_init(){
-    bpf = fir_init(bpf_coeffs, 17, BLOCK_SIZE, 1.0);
+    // Precalc cos en -sin tables to convert to IQ
+    for(uint16_t n = 0; n < BLOCK_SIZE; n++) {
+        cos_t[n] = 1.0 * cos(2.0 * M_PI * n * 1000.0 / 4000.0);
+        msin_t[n] = -1.0 * sin(2.0 * M_PI * n * 1000.0 / 4000.0);
+    }
+    
+    bpf = fir_init(bpf_coeffs, BPF_NUMTAPS, BLOCK_SIZE, 1.0);
+    q_lpf = fir_init(lpf_coeffs, LPF_NUMTAPS, BLOCK_SIZE, 1.0);
+    i_lpf = fir_init(lpf_coeffs, LPF_NUMTAPS, BLOCK_SIZE, 1.0);
 }
 
 // Entry point of processing. 
@@ -53,20 +73,27 @@ void process(const uint16_t *inp, uint16_t *outp, uint16_t size) {
     samples_to_float(inp, fir_in, BLOCK_SIZE, 255.0f);
 
     // Remove DC -> Highpass fc = 400Hz
-//    ConvDirect_Update( &c, fir_in);
     fir_update(bpf, fir_in, fir_out, BLOCK_SIZE);
 
     // fsk demodulate:
 
-    // Calculate Q: multiply with cos() and lowpass xxx Hz
-    
+    // Calculate IQ: (multiply with cos() and -sin()) and lowpass 200 Hz
+    for(uint16_t idx = 0; idx < BLOCK_SIZE; idx++) {
+        q[idx] = fir_out[idx] * cos_t[idx];
+        i[idx] = fir_out[idx] * msin_t[idx];
+    }
+    fir_update(q_lpf, q, fir_out, BLOCK_SIZE);
+    fir_update(i_lpf, i, fir_out, BLOCK_SIZE);
 
-    // Calculate I: multiply with -sin() and lowpass xxx Hz
-
-    // Calculate z=a+bj
+    // Convert to complex z=a+bj and conj(z)
+    for(uint16_t n = 0; n < BLOCK_SIZE; n++) {
+        z[(2*n)] = q[(n)];
+        z[(2*n)+1] = i[n];
+        z_conj[(2*n)] = q[n];
+        z_conj[(2*n)+1] = -1.0 * i[n];
+    }
     
-    // multiply y[n] = z[n] * conjugate(z[n-1])
-    
+        
     // calculate phase from y[n]
 
     // If phase <= 0? bit = 0; bit = 1; 

@@ -13,7 +13,7 @@ void fir_update(fir_handle_t f, float *inp, float *outp, uint16_t block_size);
 #define BPF_NUMTAPS 17
 extern const float bpf_coeffs[];
 /*
- filter designed with
+ FIR filter designed with
  http://t-filter.appspot.com
 
 sampling frequency: 4000 Hz
@@ -34,5 +34,26 @@ sampling frequency: 4000 Hz
   actual attenuation = -30.90222503104154 dB
 
 */
+
+#define LPF_NUMTAPS 27
+extern const float lpf_coeffs[];
+/*
+ FIR filter designed with
+ http://t-filter.appspot.com
+
+sampling frequency: 4000 Hz
+
+* 0 Hz - 200 Hz
+  gain = 1
+  desired ripple = 5 dB
+  actual ripple = 3.666895709039203 dB
+      
+* 400 Hz - 2000 Hz
+  gain = 0
+  desired attenuation = -40 dB
+  actual attenuation = -41.09174091632818 dB
+            
+*/
+
 
 #endif
