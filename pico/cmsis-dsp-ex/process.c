@@ -17,7 +17,7 @@ arm_rfft_fast_instance_f32 rfft;
 float32_t   maxValue;
 uint32_t    maxIndex;
 
-uint32_t    dump = 0;
+//uint32_t    dump = 0;
 
 
 uint16_t buf_size = 0;
@@ -124,15 +124,19 @@ void process(const uint16_t *inp, uint16_t *outp, uint16_t size) {
         } else {
             comp_mult(&y, z[n], z_conj[n-1]);
         }
-        if( atan2(y.im, y.re) >= 0.0) {
-            bits[n] = 1;
-        } else {
-            bits[n] = 0;
-        }
+        
+        // create bits
+        (atan2(y.im, y.re) >= 0) ? (bits[n] = 1) : (bits[n] = 0);
+
+//        if( atan2(y.im, y.re) >= 0.0) {
+//            bits[n] = 1;
+//        } else {
+//            bits[n] = 0;
+//        }
 
     }
 
-    
+/*    
     if( dump++ == 20 ) {
     
         for(uint16_t n = 0; n < BLOCK_SIZE; n++) {
@@ -147,11 +151,8 @@ void process(const uint16_t *inp, uint16_t *outp, uint16_t size) {
                 bits[n]
             );
         }
-
-                
-    
     }
-    
+*/
         
     // calculate phase from y[n]
 
@@ -162,7 +163,7 @@ void process(const uint16_t *inp, uint16_t *outp, uint16_t size) {
     // Convert back to uint16_t for pwm
     for(uint16_t idx = 0; idx < size; idx++) {
         for(uint16_t idy = 0; idy < 32; idy++) {
-            outp[32*idx+idy] = (uint16_t) (127.0f + signal[idx] * 255.0f);
+            outp[32*idx+idy] = (uint16_t) (127.0f + bits[idx] * 255.0f);
         }
     }
 

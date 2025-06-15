@@ -94,8 +94,8 @@ int main() {
 #endif
 
     // Inform
-    uint f_sys_clk = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_SYS);
-    printf("frequency_count_khz = %d\n", f_sys_clk);
+    float system_clk = clock_get_hz(clk_sys);
+    printf("frequency_count_khz = %f Hz\n", system_clk);
 
     // PWM 
     gpio_set_function(PWM_GPIO_OUT, GPIO_FUNC_PWM);
@@ -197,9 +197,9 @@ int main() {
 
 ///        start_time = time_us_64();
         dma_channel_wait_for_finish_blocking(dma_adc_ping_channel);
-//        if(5 == sample_cnt) {
+
         process(ping, pwm, BLOCK_SIZE);
-//        }
+
  
 /*        if( sample_cnt == 5 ) {
 

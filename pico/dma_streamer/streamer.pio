@@ -1,0 +1,29 @@
+.program bit_streamer
+
+
+.wrap_target
+    out pins, 1
+.wrap
+
+% c-sdk {
+
+static inline void bit_streamer_program_init(PIO pio, uint sm, uint offset, uint pin, float frequency) {
+
+    pio_sm_config c = bit_streamer_program_get_default_config(offset);
+    sm_config_set_out_shift(&c, false, true, 8);
+    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);
+    sm_config_set_out_pins(&c, pin, 1);
+    pio_gpio_init(pio, pin);
+    pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, true);
+
+    float div = clock_get_hz(clk_sys) / (10000*10);
+    sm_config_set_clkdiv(&c, div);
+
+    // Load our configuration, and jump to the start of the program
+    pio_sm_init(pio, sm, offset, &c);
+    
+    // Set the state machine running
+    pio_sm_set_enabled(pio, sm, true);
+}
+
+%}
