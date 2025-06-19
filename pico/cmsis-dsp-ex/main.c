@@ -13,20 +13,23 @@
 #include "hardware/sync.h"
 #include "hardware/pwm.h"
 #include "hardware/adc.h"
+#include "hardware/pio.h"
+
+#include "streamer.pio.h"
 
 #include "process.h"
 
 int dma_adc_ping_channel;
 int dma_adc_pong_channel;
-int dma_pwm_channel;
+int dma_fsk_channel;
 dma_channel_config adc_ping_config;
 dma_channel_config adc_pong_config;
-dma_channel_config dma_pwm_config;
+dma_channel_config dma_fsk_config;
 
 
-#define PWM_GPIO_OUT    15 //PICO_DEFAULT_LED_PIN
 #define DEBUG_PIN_PING  16
 #define DEBUG_PIN_PONG  17
+#define RAW_FSK_OUT     18
 
 #define DMA_DEBUG
 
@@ -35,7 +38,7 @@ dma_channel_config dma_pwm_config;
 uint8_t sample_cnt = 0;
 uint16_t ping[BLOCK_SIZE];
 uint16_t pong[BLOCK_SIZE];
-uint16_t pwm[BLOCK_SIZE * 32];
+uint8_t raw_fsk[BLOCK_SIZE/8];
 
 
 // ISR of ADC DMA
@@ -49,7 +52,7 @@ static void __isr __time_critical_func(dma_handler)() {
         
         // adc
         dma_channel_set_write_addr(dma_adc_ping_channel, ping, false);
-        dma_channel_set_read_addr(dma_pwm_channel, pwm, true);
+        dma_channel_set_read_addr(dma_fsk_channel, raw_fsk, true);
         // restart isr_adc
         dma_hw->ints0 = 1u << dma_adc_ping_channel;
         
@@ -66,7 +69,7 @@ static void __isr __time_critical_func(dma_handler)() {
         
         // adc
         dma_channel_set_write_addr(dma_adc_pong_channel, pong, false);
-        dma_channel_set_read_addr(dma_pwm_channel, pwm, true);
+        dma_channel_set_read_addr(dma_fsk_channel, raw_fsk, true);
         // restart isr_adc
         dma_hw->ints0 = 1u << dma_adc_pong_channel;
         
@@ -94,9 +97,32 @@ int main() {
 #endif
 
     // Inform
-    float system_clk = clock_get_hz(clk_sys);
-    printf("frequency_count_khz = %f Hz\n", system_clk);
+    uint32_t f_sys_clk = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_SYS);
+    printf("frequency_count_khz = %ld kHz\n", f_sys_clk);
 
+    // PIO - pio0 will output raw fsk decoder data using dma
+    PIO pio = pio0;
+    uint offset = pio_add_program(pio, &bit_streamer_program);
+    uint sm = pio_claim_unused_sm(pio, true);
+    bit_streamer_program_init(pio, sm, offset, RAW_FSK_OUT, 2480.0);
+    
+    // DMA output raw fsk demodulated data
+    dma_fsk_channel = dma_claim_unused_channel(true);
+    dma_fsk_config = dma_channel_get_default_config(dma_fsk_channel);
+    channel_config_set_transfer_data_size(&dma_fsk_config, DMA_SIZE_8);
+    channel_config_set_read_increment(&dma_fsk_config, true);
+    channel_config_set_write_increment(&dma_fsk_config, false);
+    channel_config_set_dreq(&dma_fsk_config, DREQ_PIO0_TX0);
+    dma_channel_configure(
+        dma_fsk_channel,
+        &dma_fsk_config,
+        &pio0_hw->txf[0],
+        NULL,
+        BLOCK_SIZE/8,
+        false
+    );
+
+/*
     // PWM 
     gpio_set_function(PWM_GPIO_OUT, GPIO_FUNC_PWM);
     gpio_set_drive_strength(PWM_GPIO_OUT, GPIO_DRIVE_STRENGTH_12MA);
@@ -126,6 +152,7 @@ int main() {
         BLOCK_SIZE * 32,
         true
     );
+*/
 
     // ADC
     adc_init();
@@ -189,38 +216,14 @@ int main() {
     // Init fir filter
     process_init(); 
 
-    // Debug timing
-    //uint64_t start_time, end_time;
-
 
     while (true) {
 
-///        start_time = time_us_64();
         dma_channel_wait_for_finish_blocking(dma_adc_ping_channel);
-
-        process(ping, pwm, BLOCK_SIZE);
-
+        process(ping, raw_fsk, BLOCK_SIZE);
  
-/*        if( sample_cnt == 5 ) {
-
-            start_time = time_us_64();
-            samples_to_float(ping, fft_inp_4khz, BLOCK_SIZE, (float)255.0f);
-            do_fft();
-            end_time = time_us_64();
-            printf("rfft %llu us\t", end_time - start_time);
-
-        }
-*/
-//        end_time = time_us_64();
-//        printf("PING et: %llu us, cnt: %d)\t", end_time - start_time, sample_cnt);
-        
-//        start_time = time_us_64();
         dma_channel_wait_for_finish_blocking(dma_adc_pong_channel);
-//        if(6 == sample_cnt) {
-        process(pong, pwm, BLOCK_SIZE);
-//        }
-//        end_time = time_us_64();
-//        printf("PONG et: %llu us, cnt: %d)\n", end_time - start_time, sample_cnt);
+        process(pong, raw_fsk, BLOCK_SIZE);
     }
 }
 

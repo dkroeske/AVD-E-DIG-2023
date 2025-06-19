@@ -9,7 +9,7 @@ cmake_minimum_required(VERSION 3.13)
 # april 25: set pico2 before includes
 set(PICO_BOARD pico2)
 
-message(STATUS "cmsis-dsp experiment for pico2: adc->fir->pwm_audio")
+message(STATUS "cmsis-dsp experiment for pico2: fsk demodulation")
 
 set(CMSISDSP ${CMAKE_CURRENT_LIST_DIR}/CMSIS-DSP)
 set(CMSISCORE ${CMAKE_CURRENT_LIST_DIR}/CMSIS_6/CMSIS/Core)
@@ -65,10 +65,9 @@ add_executable(${PROJECT_NAME}
     bandpass.c
 )
 
-#
-#pico_generate_pio_header(${PROJECT_NAME}
-#    ${CMAKE_CURRENT_LIST_DIR}/nco.pio
-#)
+pico_generate_pio_header(${PROJECT_NAME}
+    ${CMAKE_CURRENT_LIST_DIR}/streamer.pio
+)
 
 #
 pico_add_extra_outputs(${PROJECT_NAME})

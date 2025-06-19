@@ -53,7 +53,7 @@ float q[BLOCK_SIZE];
 float i[BLOCK_SIZE];
 float q_lpf[BLOCK_SIZE];
 float i_lpf[BLOCK_SIZE];
-uint8_t bits[BLOCK_SIZE];
+//uint8_t bits[BLOCK_SIZE];
 
 struct comp_t {
     float re, im;
@@ -93,8 +93,10 @@ void process_init(){
     lpf_b = fir_init(lpf_coeffs, LPF_NUMTAPS, BLOCK_SIZE, 1.0);
 }
 
+// 
 // Entry point of processing. 
-void process(const uint16_t *inp, uint16_t *outp, uint16_t size) {
+//
+void process(const uint16_t *inp, uint8_t *outp, uint16_t size) {
 
     // Convert samples to float
     samples_to_float(inp, signal, BLOCK_SIZE, 255.0f);
@@ -126,7 +128,14 @@ void process(const uint16_t *inp, uint16_t *outp, uint16_t size) {
         }
         
         // create bits
-        (atan2(y.im, y.re) >= 0) ? (bits[n] = 1) : (bits[n] = 0);
+//        (atan2(y.im, y.re) >= 0) ? (bits[n] = 1) : (bits[n] = 0);
+
+        // pack bits into outp. E.g.
+        if( atan2(y.im, y.re) >= 0) {
+            outp[n/8] |= (0x01 << (7-(n%8)));
+        } else {
+            outp[n/8] &= ~(0x01 << (7-(n%8)));
+        }
 
 //        if( atan2(y.im, y.re) >= 0.0) {
 //            bits[n] = 1;
@@ -161,11 +170,12 @@ void process(const uint16_t *inp, uint16_t *outp, uint16_t size) {
     // decode bit-stream
 
     // Convert back to uint16_t for pwm
-    for(uint16_t idx = 0; idx < size; idx++) {
+/*    for(uint16_t idx = 0; idx < size; idx++) {
         for(uint16_t idy = 0; idy < 32; idy++) {
             outp[32*idx+idy] = (uint16_t) (127.0f + bits[idx] * 255.0f);
         }
     }
+*/
 
 /*
     printf("----------\nBLOCK_SIZE = %d\n", BLOCK_SIZE);

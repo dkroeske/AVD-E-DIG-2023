@@ -50,7 +50,7 @@ int main() {
     uint sm = pio_claim_unused_sm(pio, true);
 
     printf("sm: %d\n", sm);
-    bit_streamer_program_init(pio, sm, offset, 16, 517e3);
+    bit_streamer_program_init(pio, sm, offset, 16, 81920.0);
 
 
     // Set DMA to tranfer 1024 bits to pio
@@ -95,7 +95,7 @@ int main() {
 
         dma_channel_wait_for_finish_blocking(dma_chan);
         dma_channel_set_read_addr(dma_chan, data, true);
-        printf(".\n");
+//        printf(".\n");
         sleep_ms(2000);
 //        printf(".\n");
 
