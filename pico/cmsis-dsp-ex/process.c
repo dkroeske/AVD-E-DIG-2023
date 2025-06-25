@@ -17,7 +17,7 @@ arm_rfft_fast_instance_f32 rfft;
 float32_t   maxValue;
 uint32_t    maxIndex;
 
-//uint32_t    dump = 0;
+uint32_t    dump = 0;
 
 
 uint16_t buf_size = 0;
@@ -127,9 +127,6 @@ void process(const uint16_t *inp, uint8_t *outp, uint16_t size) {
             comp_mult(&y, z[n], z_conj[n-1]);
         }
         
-        // create bits
-//        (atan2(y.im, y.re) >= 0) ? (bits[n] = 1) : (bits[n] = 0);
-
         // pack bits into outp. E.g.
         if( atan2(y.im, y.re) >= 0) {
             outp[n/8] |= (0x01 << (7-(n%8)));
@@ -137,16 +134,16 @@ void process(const uint16_t *inp, uint8_t *outp, uint16_t size) {
             outp[n/8] &= ~(0x01 << (7-(n%8)));
         }
 
-//        if( atan2(y.im, y.re) >= 0.0) {
-//            bits[n] = 1;
-//        } else {
-//            bits[n] = 0;
-//        }
 
+//        if( atan2(y.im, y.re) >= 0.0) {
+//            outp[n] = 1;
+//        } else {
+//            outp[n] = 0;
+//        }
     }
 
-/*    
-    if( dump++ == 20 ) {
+//    dump++; 
+    if( dump >= 20 ) {
     
         for(uint16_t n = 0; n < BLOCK_SIZE; n++) {
             printf("%d;%f;%f;%f;%f;%f;%f;%d\n",
@@ -157,18 +154,13 @@ void process(const uint16_t *inp, uint8_t *outp, uint16_t size) {
                 i[n],
                 q_lpf[n],
                 i_lpf[n],
-                bits[n]
+                outp[n]
             );
+
         }
     }
-*/
+
         
-    // calculate phase from y[n]
-
-    // If phase <= 0? bit = 0; bit = 1; 
-
-    // decode bit-stream
-
     // Convert back to uint16_t for pwm
 /*    for(uint16_t idx = 0; idx < size; idx++) {
         for(uint16_t idy = 0; idy < 32; idy++) {
@@ -176,14 +168,6 @@ void process(const uint16_t *inp, uint8_t *outp, uint16_t size) {
         }
     }
 */
-
-/*
-    printf("----------\nBLOCK_SIZE = %d\n", BLOCK_SIZE);
-    for(uint16_t idx = 0; idx < BLOCK_SIZE; idx++) {
-        printf("%d %d, %f %f\n", idx, inp[idx], fir_in[idx], c.out[idx]);
-    }
-*/
-
 
 }
 
