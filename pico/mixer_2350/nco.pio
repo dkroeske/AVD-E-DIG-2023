@@ -1,0 +1,48 @@
+.program nco
+
+
+; Output and inverse
+; # 0: __------______------_  
+; # 1: --______------______-
+;
+.wrap_target
+    set pins 2 ; output 10
+    set pins 1 ; output 01
+.wrap
+
+% c-sdk {
+
+void nco_set_frequency(PIO pio, uint sm, float frequency) {
+
+    // frequency to fractional divider 16:8
+    float nco_div = (float) clock_get_hz(clk_sys) / 2 / frequency;
+    uint16_t div_int = (uint16_t)(nco_div);
+    uint8_t div_frac = (uint8_t)( (nco_div - (uint8_t)(nco_div))*256 );
+
+    // Set divider
+//    sm_config_set_clkdiv_int_frac(&c, div_int, div_frac);
+    pio_sm_set_clkdiv_int_frac(pio, sm, div_int, div_frac);
+}
+
+static inline void nco_program_init(PIO pio, uint sm, uint offset, uint pin_a, uint pin_b, float frequency) {
+
+    pio_sm_config c = nco_program_get_default_config(offset);
+
+    sm_config_set_set_pins(&c, pin_a, 2);
+   
+    pio_gpio_init(pio, pin_a);
+    pio_gpio_init(pio, pin_a+1);
+
+    pio_sm_set_consecutive_pindirs(pio, sm, pin_a, 2, true);
+
+    // Load our configuration, and jump to the start of the program
+    pio_sm_init(pio, sm, offset, &c);
+    
+    // Set nco frequency
+    nco_set_frequency(pio, sm, frequency);
+
+    // Set the state machine running
+    pio_sm_set_enabled(pio, sm, true);
+}
+
+%}

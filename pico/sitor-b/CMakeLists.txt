@@ -1,19 +1,21 @@
 #
-# Helloworld example
+# PICO SITOR-B decoder 
 #
-
+# 2025/07/27    dkroeske@gmail.com  Initial
+#
 #
 cmake_minimum_required(VERSION 3.13)
 
-# Working
 set(PICO_BOARD pico2)
+
+message(STATUS "SITOR-B decoder. To be used in de NAVTEX SDR receiver")
 
 # Include tools van de PICO sdk
 include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
 include($ENV{PICO_SDK_PATH}/tools/CMakeLists.txt)
 
 # Projectnaam
-project(helloworld_pico2 C CXX ASM)
+project(sitor-b C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
@@ -27,18 +29,21 @@ if (NOT DEFINED PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS)
     set(PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS 3000)
 endif()
 
+
 # 
 pico_sdk_init()
-
 
 #
 add_compile_options(
     -Wall
     -Werror
+    -O0
+    -g
 )
 
 add_executable(${PROJECT_NAME}
     main.c
+    ccir476.c
 )
 
 #
@@ -48,6 +53,14 @@ pico_add_extra_outputs(${PROJECT_NAME})
 target_link_libraries(${PROJECT_NAME} 
     pico_stdlib
     pico_stdio_usb
+    hardware_gpio
+    hardware_pio
+    hardware_dma
+    hardware_sync
+    hardware_clocks
+    hardware_irq
+    hardware_pwm
+    hardware_adc
 )
 
 #
