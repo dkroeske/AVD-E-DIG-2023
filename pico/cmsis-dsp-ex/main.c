@@ -15,7 +15,7 @@
 #include "hardware/pio.h"
 
 #include "streamer.pio.h"
-
+#include "ccir476.h"
 #include "process.h"
 
 int dma_adc_ping_channel;
@@ -29,8 +29,9 @@ dma_channel_config dma_fsk_pong_config;
 
 #define DEBUG_PIN_PING  16
 #define DEBUG_PIN_PONG  17
-#define RAW_FSK_OUT     18
+#define RAW_FSK_OUT     19
 #define ADC_PIN         26
+#define SITOR_PIN       18
 
 #define DMA_DEBUG
 
@@ -82,6 +83,75 @@ static void __isr __time_critical_func(dma_handler)() {
 }
 
 
+// callback from navtex decoder
+void sitorb_msg_available(char *msg) {
+    printf("%s", msg);
+}
+
+void sitorb_char_available(char c) {
+    printf("%c", c);
+}
+
+void sitorb_err(char *msg) {
+    printf("%s", msg);
+}
+
+
+#define HEARTBEAT_US      1000000
+#define SBIT_L_US          9*1000 // 9ms <= validbit <= 11ms
+#define SBIT_H_US         11*1000  
+#define SIDLE_US          SBIT_L_US * 40
+#define SGLITCH_US        4 * 2000
+
+
+/*
+ * Capture and handle FSK bits and glitched. Pass to ccir476 decoder
+ *
+ */
+void gpio_callback(uint gpio, uint32_t events) {
+
+    static absolute_time_t last_irq_time;
+    absolute_time_t now = get_absolute_time();
+    absolute_time_t delta =  absolute_time_diff_us(last_irq_time, now);
+    uint8_t count, bit;
+
+    if( absolute_time_diff_us(last_irq_time, now) <= SGLITCH_US ) {
+        printf("[*]");            
+    } else {
+        if( delta >= SIDLE_US ) {
+            printf("[Idle detected]\n");            
+            // ccir476_rearm();
+        } else {
+        
+            //
+            // Bepaal aantal ontvangen 1 of 0 achterelkaar en level
+            //
+            count = ((delta+5000)/10000);           
+            //bit;
+            
+            if(events & GPIO_IRQ_EDGE_RISE) {
+                bit = 0;
+            } else {
+                if(events & GPIO_IRQ_EDGE_FALL) {
+                    bit = 1;
+                } else {
+                    printf("bitlevel not 0 or 1, huh??\n");
+                }
+            }
+            
+            // Handle all individual bits incl. synchronize
+            //for(uint8_t idx = 0; idx < count; idx++) {
+            //    ccir476_process_bit(bit);            
+            //}
+        }
+    }
+
+    printf("%lld:%d:%d\n", delta, count, bit);
+
+    last_irq_time = now;
+}
+
+
 int main() {
 
     stdio_init_all();
@@ -99,6 +169,19 @@ int main() {
     printf("System clock [khz] = %ld kHz\n", f_sys_clk);
     uint32_t f_adc_clk = clock_get_hz(clk_adc);
     printf("ADC clock [hz] = %ld Hz\n", f_adc_clk);
+
+    // SITOR decoder
+//    gpio_init(SITOR_PIN);
+//    gpio_set_dir(SITOR_PIN, GPIO_IN);
+//    gpio_pull_up(SITOR_PIN);
+    gpio_set_irq_enabled_with_callback(
+        RAW_FSK_OUT, //SITOR_PIN,
+        GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL,
+        true,
+        &gpio_callback
+    );
+    // Init decoder
+    ccir476_init(&sitorb_msg_available, &sitorb_char_available, &sitorb_err); 
 
     // PIO - pio0 will output raw fsk decoder data using dma
     // Output rate = 100 baud (bits/s) meaning 1 bit takes 10ms

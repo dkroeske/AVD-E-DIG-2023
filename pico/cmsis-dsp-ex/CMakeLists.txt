@@ -63,6 +63,7 @@ add_executable(${PROJECT_NAME}
     main.c
     process.c
     bandpass.c
+    ccir476.c
 )
 
 pico_generate_pio_header(${PROJECT_NAME}
@@ -97,5 +98,4 @@ target_link_libraries(${PROJECT_NAME}
 #
 pico_enable_stdio_usb(${PROJECT_NAME} 1)
 pico_enable_stdio_uart(${PROJECT_NAME} 1)
-
 
