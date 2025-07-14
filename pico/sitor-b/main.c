@@ -123,6 +123,7 @@ void sitorb_err(char *msg) {
  * Capture and handle FSK bits and glitched. Pass to ccir476 decoder
  *
  */
+/*
 void gpio_callback(uint gpio, uint32_t events) {
 
     static absolute_time_t last_irq_time;
@@ -162,7 +163,61 @@ void gpio_callback(uint gpio, uint32_t events) {
 
     last_irq_time = now;
 }
+*/
 
+volatile int8_t cnt = 0;
+volatile bool olev = false;
+volatile bool nlev = false;
+static absolute_time_t last_irq_time;
+bool gpio_fsk_callback(struct repeating_timer *t) {
+    
+    bool level = gpio_get(SITOR_PIN);
+
+    if(level) {
+        if( cnt < 3 ) {
+            cnt++; 
+        } else {
+            nlev = true;
+        }
+    }
+    else {
+        if( cnt > -3 ) {
+            cnt--;
+        } else {
+            nlev = false;
+        }
+    }
+
+    //
+    if(olev != nlev) {
+        
+        // DEBUG
+        gpio_put(DEBUG_PIN, nlev);
+        
+        // Calc delta
+        absolute_time_t now = get_absolute_time();
+        absolute_time_t delta = absolute_time_diff_us(last_irq_time, now);
+        
+        // If IDLE reset fsm else split delta in 10ms (SITOR-B, 100 baud) parts 
+        // and pass to ccir476 processor. The ccir476 will sync and convert individual bits
+        // to bytes and do the NAVTEX decoding
+        if( delta >= SIDLE_US ) {
+            printf("[Idle detected]\n");            
+            ccir476_rearm();
+        } else {
+            uint8_t count = ((delta+5000)/10000);           
+            for(uint8_t idx = 0; idx < count; idx++) {
+                ccir476_process_bit(olev);            
+            }
+        }
+//        printf("%d -> %.6lld\n", nlev, delta);
+        olev = nlev;
+        last_irq_time = now;
+    }
+    
+    // return true for next periodic interrupt.
+    return true;
+}
 
 int main() {
 
@@ -179,12 +234,15 @@ int main() {
     gpio_init(SITOR_PIN);
     gpio_set_dir(SITOR_PIN, GPIO_IN);
     gpio_pull_up(SITOR_PIN);
-    gpio_set_irq_enabled_with_callback(
-        SITOR_PIN,
-        GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL,
-        true,
-        &gpio_callback
-    );
+//    gpio_set_irq_enabled_with_callback(
+//        SITOR_PIN,
+//        GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL,
+//        true,
+//        &gpio_callback
+//    );
+    
+    static struct repeating_timer timer;
+    add_repeating_timer_us(-250, gpio_fsk_callback, NULL, &timer);
 
     // Inform
     uint32_t f_sys_clk = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_SYS);
