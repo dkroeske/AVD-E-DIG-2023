@@ -1,8 +1,5 @@
-
-//
 #include "stdio.h"
 #include "process.h"
-//#include "fir.h"
 #include "bandpass.h"
 #include "math.h"
 
@@ -104,9 +101,8 @@ void process(const uint16_t *inp, uint8_t *outp, uint16_t size) {
     // Remove DC -> Highpass fc = 400Hz
     fir_update(bpf, signal, signal_bpf, BLOCK_SIZE);
 
-    // fsk demodulate:
-
-
+    // fsk demodulate IQ style:
+    //
     // Calculate IQ: (multiply with cos() and -sin()) and lowpass 200 Hz
     for(uint16_t idx = 0; idx < BLOCK_SIZE; idx++) {
         q[idx] = signal_bpf[idx] * cos_t[idx];
@@ -133,42 +129,7 @@ void process(const uint16_t *inp, uint8_t *outp, uint16_t size) {
         } else {
             outp[n/8] &= ~(0x01 << (7-(n%8)));
         }
-
-
-//        if( atan2(y.im, y.re) >= 0.0) {
-//            outp[n] = 1;
-//        } else {
-//            outp[n] = 0;
-//        }
     }
-
-//    dump++; 
-    if( dump >= 20 ) {
-    
-        for(uint16_t n = 0; n < BLOCK_SIZE; n++) {
-            printf("%d;%f;%f;%f;%f;%f;%f;%d\n",
-                inp[n],
-                signal[n],
-                signal_bpf[n],
-                q[n],
-                i[n],
-                q_lpf[n],
-                i_lpf[n],
-                outp[n]
-            );
-
-        }
-    }
-
-        
-    // Convert back to uint16_t for pwm
-/*    for(uint16_t idx = 0; idx < size; idx++) {
-        for(uint16_t idy = 0; idy < 32; idy++) {
-            outp[32*idx+idy] = (uint16_t) (127.0f + bits[idx] * 255.0f);
-        }
-    }
-*/
-
 }
 
 

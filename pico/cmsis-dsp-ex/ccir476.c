@@ -290,7 +290,7 @@ Version:    DMK, Initial code
         // Something went wrong
         case SB_SERR:
             if( sitorb_err != NULL ) {
-                sitorb_err("sitorb fsm err"); 
+                sitorb_err("[CCIR476 fsm error detected.\n]"); 
             }
             sitorb_state = SB_S3;
             break;

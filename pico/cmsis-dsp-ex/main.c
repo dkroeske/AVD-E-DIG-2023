@@ -33,7 +33,15 @@ dma_channel_config dma_fsk_pong_config;
 #define ADC_PIN         26
 #define DEBUG_PIN_FSK   18
 
+#define CCIR476_RX_LED  3
+#define CCIR476_ERR_LED 2
+
 #define DMA_DEBUG
+#define FSK_DEBUG
+
+#define SITOR_BIT_US        10000  // Nominal sitor-bit = 10ms (100 baud)
+#define SITOR_HALF_BIT_US   SITOR_BIT_US / 2  
+#define SITOR_IDLE_US       SITOR_BIT_US * 20
 
 // ADC in and raw_fsk bits out
 uint16_t ping[BLOCK_SIZE];
@@ -43,6 +51,10 @@ uint8_t raw_fsk_pong[BLOCK_SIZE/8];
 
 const uint32_t sample_freq = 4000;
 
+volatile int8_t cnt = 0;
+volatile bool olev = false;
+volatile bool nlev = false;
+static absolute_time_t last_irq_time;
 
 // ISR of ADC DMA
 static void __isr __time_critical_func(dma_handler)() {
@@ -88,27 +100,41 @@ void sitorb_msg_available(char *msg) {
     printf("%s", msg);
 }
 
+// CCIR476 callback, also set status to LED
+static struct repeating_timer timer_rx_led;
+static struct repeating_timer timer_err_led;
+bool rx_led_callback(struct repeating_timer *t) { 
+    gpio_put(CCIR476_RX_LED, 0);
+    return false;
+}
+bool err_led_callback(struct repeating_timer *t) { 
+    gpio_put(CCIR476_ERR_LED, 0);
+    return false;
+}
+
 void sitorb_char_available(char c) {
     printf("%c", c);
+    gpio_put(CCIR476_RX_LED, 1);
+    add_repeating_timer_ms(200, rx_led_callback, NULL, &timer_rx_led);
 }
 
 void sitorb_err(char *msg) {
     printf("%s", msg);
+    gpio_put(CCIR476_ERR_LED, 1);
+    add_repeating_timer_ms(1000, err_led_callback, NULL, &timer_err_led);
 }
 
 
-#define SBIT_L_US          9*1000 // 9ms <= validbit <= 11ms
-#define SBIT_H_US         11*1000  
-#define SIDLE_US          SBIT_L_US * 40
-#define SGLITCH_US        4 * 2000
-
-
-volatile int8_t cnt = 0;
-volatile bool olev = false;
-volatile bool nlev = false;
-static absolute_time_t last_irq_time;
-
+/*******************************************************************/
 bool gpio_fsk_callback(struct repeating_timer *t) {
+/* 
+short:      Callback periodic time to sample raw fsk output. This
+            output is used to decode CCIR476 (NAVTEX) messages         
+inputs:        
+outputs: 
+notes:         
+Version:    DMK, Initial code
+********************************************************************/
     
     bool level = gpio_get(RAW_FSK_OUT_PIN);
 
@@ -130,10 +156,9 @@ bool gpio_fsk_callback(struct repeating_timer *t) {
     //
     if(olev != nlev) {
         
-        #ifdef DMA_DEBUG        
+#ifdef FSK_DEBUG        
         gpio_put(DEBUG_PIN_FSK, nlev);
-        #endif
-        
+#endif
         // Calc delta
         absolute_time_t now = get_absolute_time();
         absolute_time_t delta = absolute_time_diff_us(last_irq_time, now);
@@ -141,16 +166,20 @@ bool gpio_fsk_callback(struct repeating_timer *t) {
         // If IDLE reset fsm else split delta in 10ms (SITOR-B, 100 baud) parts 
         // and pass to ccir476 processor. The ccir476 will sync and convert individual bits
         // to bytes and do the NAVTEX decoding
-        if( delta >= SIDLE_US ) {
-            printf("[Idle detected]\n");            
+        if( delta >= SITOR_IDLE_US ) {
+#ifdef FSK_DEBUG        
+            printf("[Idle]\n");            
+#endif
             ccir476_rearm();
         } else {
-            uint8_t count = ((delta+5000)/10000);           
+            uint8_t count = ((delta+SITOR_HALF_BIT_US)/SITOR_BIT_US);           
             for(uint8_t idx = 0; idx < count; idx++) {
                 ccir476_process_bit(olev);            
             }
         }
+#ifdef FSK_DEBUG
 //        printf("%d -> %.6lld\n", nlev, delta);
+#endif
         olev = nlev;
         last_irq_time = now;
     }
@@ -179,6 +208,25 @@ int main() {
     printf("System clock [khz] = %ld kHz\n", f_sys_clk);
     uint32_t f_adc_clk = clock_get_hz(clk_adc);
     printf("ADC clock [hz] = %ld Hz\n", f_adc_clk);
+
+    // Init status leds and do a little led dance
+    gpio_init(CCIR476_RX_LED);
+    gpio_set_dir(CCIR476_RX_LED, GPIO_OUT);
+    gpio_init(CCIR476_ERR_LED);
+    gpio_set_dir(CCIR476_ERR_LED, GPIO_OUT);
+    for(uint8_t idx = 0; idx < 3; idx++ ) {
+        gpio_put(CCIR476_RX_LED, 1);
+        gpio_put(CCIR476_ERR_LED, 0);
+        sleep_ms(100);
+        gpio_put(CCIR476_RX_LED, 0);
+        gpio_put(CCIR476_ERR_LED, 1);
+        sleep_ms(100);
+    }
+    gpio_put(CCIR476_RX_LED, 1);
+    gpio_put(CCIR476_ERR_LED, 1);
+    sleep_ms(400);
+    gpio_put(CCIR476_RX_LED, 0);
+    gpio_put(CCIR476_ERR_LED, 0);
 
     // fsk sampling repeating timer
     static struct repeating_timer timer_fsk;
@@ -294,28 +342,9 @@ int main() {
 
         dma_channel_wait_for_finish_blocking(dma_adc_ping_channel);
         process(ping, raw_fsk_ping, BLOCK_SIZE);
-/*        for(uint16_t idx = 0; idx < BLOCK_SIZE; idx++) {
-            if( raw_bits[idx] == 1 ) {
-                gpio_put(RAW_FSK_OUT, true);
-            } else {
-                gpio_put(RAW_FSK_OUT, false);
-            }
-            sleep_us(200);
-        }
-*/
-
  
         dma_channel_wait_for_finish_blocking(dma_adc_pong_channel);
         process(pong, raw_fsk_pong, BLOCK_SIZE);
-/*        for(uint16_t idx = 0; idx < BLOCK_SIZE; idx++) {
-            if( raw_bits[idx] == 1 ) {
-                gpio_put(RAW_FSK_OUT, true);
-            } else {
-                gpio_put(RAW_FSK_OUT, false);
-            }
-            sleep_us(200);
-        }
-*/
     }
 }
 
